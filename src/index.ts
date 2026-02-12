@@ -69,16 +69,24 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Dashboard — serve at root
-app.use('/dashboard', express.static(path.join(__dirname, 'dashboard')));
-app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard', 'index.html'));
-});
+// Frontend — serve React app from frontend/dist
+const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendPath));
+
+// Legacy dashboard redirect
 app.get('/dashboard', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard', 'index.html'));
+  res.redirect('/');
 });
 
-// 404
+// SPA fallback — serve index.html for all non-API routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/ws') || req.path === '/health') {
+    return next();
+  }
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+// 404 for API routes
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
