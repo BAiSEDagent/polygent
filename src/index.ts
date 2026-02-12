@@ -8,8 +8,17 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import apiRoutes from './api/routes';
 import { initDataFeed, getConnectedClientCount } from './core/data-feed';
+import { liveDataService } from './core/live-data';
+import { agentRunner } from './core/agent-runner';
+import { paperTrader } from './core/paper-trader';
 import { agentStore } from './models/agent';
 import { tradeStore } from './models/trade';
+
+// Strategies
+import { WhaleTrackerStrategy } from './strategies/whale-tracker';
+import { ArbitrageStrategy } from './strategies/arbitrage';
+import { ContrarianStrategy } from './strategies/contrarian';
+import { SentimentStrategy } from './strategies/sentiment';
 
 const app = express();
 const server = http.createServer(app);
@@ -21,7 +30,6 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-// Rate limiting
 app.use(
   '/api/',
   rateLimit({
@@ -33,7 +41,6 @@ app.use(
   })
 );
 
-// Request logging
 app.use((req, _res, next) => {
   if (req.path !== '/health') {
     logger.debug(`${req.method} ${req.path}`, {
@@ -50,18 +57,23 @@ app.use('/api', apiRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
+  const stats = liveDataService.getStats();
   res.json({
     status: 'ok',
-    version: '0.1.0',
+    version: '0.2.0',
     uptime: Math.floor((Date.now() - startTime) / 1000),
     agents: agentStore.count(),
     openOrders: tradeStore.getOpenOrderCount(),
     wsClients: getConnectedClientCount(),
+    liveData: stats,
   });
 });
 
-// Dashboard
+// Dashboard — serve at root
 app.use('/dashboard', express.static(path.join(__dirname, 'dashboard')));
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard', 'index.html'));
+});
 app.get('/dashboard', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard', 'index.html'));
 });
@@ -77,23 +89,65 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// ─── Start ───────────────────────────────────────────────────────────────────
+// ─── Bootstrap ───────────────────────────────────────────────────────────────
 
-initDataFeed(server);
+async function bootstrap(): Promise<void> {
+  logger.info('🧠 Cogent — AI Agent Trading Platform for Polymarket');
+  logger.info('─'.repeat(60));
 
-server.listen(config.PORT, () => {
-  logger.info(`🧠 Cogent server running on port ${config.PORT}`, {
-    env: config.NODE_ENV,
-    builderId: config.BUILDER_ID || '(not set)',
+  // 1. Initialize WebSocket data feed
+  initDataFeed(server);
+
+  // 2. Start live data service
+  await liveDataService.start();
+
+  // 3. Register strategy agents
+  agentRunner.registerAgent('Whale Tracker', new WhaleTrackerStrategy(), {
+    deposit: 10_000,
+    intervalMs: 5 * 60_000, // 5 min
   });
-  logger.info(`📊 Dashboard: http://localhost:${config.PORT}/dashboard`);
-  logger.info(`🔌 WebSocket: ws://localhost:${config.PORT}/ws/feed`);
-  logger.info(`💚 Health: http://localhost:${config.PORT}/health`);
+
+  agentRunner.registerAgent('Arbitrage Scanner', new ArbitrageStrategy(), {
+    deposit: 10_000,
+    intervalMs: 2 * 60_000, // 2 min (arb needs speed)
+  });
+
+  agentRunner.registerAgent('Contrarian', new ContrarianStrategy(), {
+    deposit: 10_000,
+    intervalMs: 10 * 60_000, // 10 min
+  });
+
+  // Sentiment is a stub — register but won't produce signals without sources
+  agentRunner.registerAgent('Sentiment', new SentimentStrategy(), {
+    deposit: 10_000,
+    intervalMs: 15 * 60_000,
+  });
+
+  // 4. Start agent runner
+  await agentRunner.start();
+
+  // 5. Start Express server
+  server.listen(config.PORT, () => {
+    logger.info('─'.repeat(60));
+    logger.info(`🚀 Server running on port ${config.PORT}`);
+    logger.info(`📊 Dashboard: http://localhost:${config.PORT}/`);
+    logger.info(`🔌 WebSocket: ws://localhost:${config.PORT}/ws/feed`);
+    logger.info(`💚 Health: http://localhost:${config.PORT}/health`);
+    logger.info(`📡 API: http://localhost:${config.PORT}/api/`);
+    logger.info('─'.repeat(60));
+  });
+}
+
+bootstrap().catch((err) => {
+  logger.error('Bootstrap failed', { error: err.message, stack: err.stack });
+  process.exit(1);
 });
 
 // Graceful shutdown
-const shutdown = () => {
+const shutdown = async () => {
   logger.info('Shutting down...');
+  agentRunner.stop();
+  liveDataService.stop();
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);

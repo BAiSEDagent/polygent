@@ -102,7 +102,7 @@ export async function signOrder(
   const wallet = getAgentWallet(agentId);
   if (!wallet) throw new Error(`Agent ${agentId} not found`);
 
-  const signature = await wallet.signTypedData(domain, types, value);
+  const signature = await wallet._signTypedData(domain, types, value);
   return signature;
 }
 

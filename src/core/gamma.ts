@@ -73,8 +73,8 @@ class GammaClient {
       questionId: raw.question_id ?? raw.questionId ?? '',
       question: raw.question ?? '',
       description: raw.description ?? '',
-      outcomes: raw.outcomes ?? ['Yes', 'No'],
-      outcomePrices: (raw.outcomePrices ?? raw.outcome_prices ?? []).map(Number),
+      outcomes: this.parseStringArray(raw.outcomes) ?? ['Yes', 'No'],
+      outcomePrices: this.parsePrices(raw.outcomePrices ?? raw.outcome_prices),
       volume: Number(raw.volume ?? raw.volumeNum ?? 0),
       liquidity: Number(raw.liquidity ?? raw.liquidityNum ?? 0),
       endDate: raw.end_date_iso ?? raw.endDate ?? '',
@@ -142,6 +142,30 @@ class GammaClient {
   /** Get top markets by volume */
   async getTopMarkets(limit = 10): Promise<Market[]> {
     return this.listMarkets({ limit, order: 'volume', ascending: false });
+  }
+
+  /** Parse a string-or-array field (Gamma returns JSON strings for arrays) */
+  private parseStringArray(raw: unknown): string[] | null {
+    if (!raw) return null;
+    if (Array.isArray(raw)) return raw.map(String);
+    if (typeof raw === 'string') {
+      try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed.map(String) : null; } catch { return null; }
+    }
+    return null;
+  }
+
+  /** Parse outcomePrices which may be a JSON string, array of strings, or array of numbers */
+  private parsePrices(raw: unknown): number[] {
+    if (!raw) return [];
+    let arr: unknown[];
+    if (typeof raw === 'string') {
+      try { arr = JSON.parse(raw); } catch { return []; }
+    } else if (Array.isArray(raw)) {
+      arr = raw;
+    } else {
+      return [];
+    }
+    return arr.map(Number).filter(n => !isNaN(n));
   }
 
   /** Clear the cache */
