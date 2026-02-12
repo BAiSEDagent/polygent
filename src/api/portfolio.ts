@@ -7,15 +7,12 @@ import { Agent, Portfolio, Position } from '../utils/types';
 
 const router = Router();
 
-/** GET /api/portfolio/:agentId — Get agent portfolio with P&L */
-router.get('/:agentId', authenticateAdmin, async (req: Request, res: Response) => {
-  const agent = agentStore.get(req.params.agentId);
-  if (!agent) {
-    res.status(404).json({ error: 'Agent not found' });
-    return;
-  }
-
+/** GET /api/portfolio — Portfolio for authenticated agent (via X-API-Key) */
+router.get('/', authenticateAgent, async (req: Request, res: Response) => {
+  const agent = (req as any).agent as Agent;
   try {
+    // Update lastActivity
+    agentStore.update(agent.id, { lastActivity: Date.now() } as any);
     const portfolio = await buildPortfolio(agent);
     res.json(portfolio);
   } catch (error) {
@@ -23,28 +20,12 @@ router.get('/:agentId', authenticateAdmin, async (req: Request, res: Response) =
   }
 });
 
-/** GET /api/portfolio/:agentId/history — Trade history */
-router.get('/:agentId/history', authenticateAdmin, (req: Request, res: Response) => {
-  const agent = agentStore.get(req.params.agentId);
-  if (!agent) {
-    res.status(404).json({ error: 'Agent not found' });
-    return;
-  }
-
+/** GET /api/portfolio/history — Trade history for authenticated agent */
+router.get('/history', authenticateAgent, (req: Request, res: Response) => {
+  const agent = (req as any).agent as Agent;
   const limit = parseInt(req.query.limit as string) || 50;
   const trades = tradeStore.getAgentTrades(agent.id, limit);
   res.json({ trades, total: trades.length });
-});
-
-/** GET /api/portfolio/me — Portfolio for authenticated agent */
-router.get('/me', authenticateAgent, async (req: Request, res: Response) => {
-  const agent = (req as any).agent as Agent;
-  try {
-    const portfolio = await buildPortfolio(agent);
-    res.json(portfolio);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to calculate portfolio' });
-  }
 });
 
 /** GET /api/portfolio/leaderboard — Agent leaderboard */
@@ -64,6 +45,7 @@ router.get('/leaderboard', async (_req: Request, res: Response) => {
       return {
         agentId: agent.id,
         name: agent.name,
+        strategy: agent.strategy ?? 'unknown',
         equity: agent.equity.current,
         deposited: agent.equity.deposited,
         pnl,
@@ -79,10 +61,38 @@ router.get('/leaderboard', async (_req: Request, res: Response) => {
   res.json({ leaderboard, total: leaderboard.length });
 });
 
+/** GET /api/portfolio/:agentId — Get agent portfolio with P&L (admin) */
+router.get('/:agentId', authenticateAdmin, async (req: Request, res: Response) => {
+  const agent = agentStore.get(req.params.agentId);
+  if (!agent) {
+    res.status(404).json({ error: 'Agent not found' });
+    return;
+  }
+
+  try {
+    const portfolio = await buildPortfolio(agent);
+    res.json(portfolio);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to calculate portfolio' });
+  }
+});
+
+/** GET /api/portfolio/:agentId/history — Trade history (admin) */
+router.get('/:agentId/history', authenticateAdmin, (req: Request, res: Response) => {
+  const agent = agentStore.get(req.params.agentId);
+  if (!agent) {
+    res.status(404).json({ error: 'Agent not found' });
+    return;
+  }
+
+  const limit = parseInt(req.query.limit as string) || 50;
+  const trades = tradeStore.getAgentTrades(agent.id, limit);
+  res.json({ trades, total: trades.length });
+});
+
 async function buildPortfolio(agent: Agent): Promise<Portfolio> {
   const positions = tradeStore.getAgentPositions(agent.id);
 
-  // Try to update current prices from Gamma API
   const updatedPositions: Position[] = await Promise.all(
     positions.map(async (pos) => {
       try {

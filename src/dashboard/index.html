@@ -322,6 +322,17 @@
       </div>
     </div>
 
+    <!-- Connected External Agents -->
+    <div class="card full-width">
+      <div class="card-header">
+        🔌 Connected Agents (via API)
+        <span class="count" id="connected-count">0</span>
+      </div>
+      <div class="card-body" id="connected-body">
+        <div class="empty-state"><div class="icon">🌐</div>No external agents connected</div>
+      </div>
+    </div>
+
     <!-- Activity Feed -->
     <div class="card full-width">
       <div class="card-header">
@@ -477,6 +488,35 @@
       }).join('');
     }
 
+    async function refreshConnectedAgents() {
+      const data = await fetchJSON('/api/connected-agents');
+      if (!data?.agents) return;
+
+      const el = document.getElementById('connected-body');
+      document.getElementById('connected-count').textContent = data.agents.length;
+
+      if (data.agents.length === 0) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">🌐</div>No external agents connected yet</div>';
+        return;
+      }
+
+      el.innerHTML = data.agents.map(a => {
+        const pnl = a.pnl ?? 0;
+        const lastAgo = Math.floor((Date.now() - a.lastActivity) / 1000);
+        const lastStr = lastAgo < 60 ? `${lastAgo}s ago` : lastAgo < 3600 ? `${Math.floor(lastAgo/60)}m ago` : `${Math.floor(lastAgo/3600)}h ago`;
+        return `<div class="agent-row">
+          <div>
+            <div class="name">${a.name}</div>
+            <div class="strategy">${a.strategy ?? 'unknown'} • ${a.description?.slice(0, 40) ?? ''}</div>
+          </div>
+          <span class="equity">${fmt.usd(a.equity ?? 0)}</span>
+          <span class="pnl ${fmt.pnlClass(pnl)}">${fmt.pnl(pnl)}</span>
+          <span class="trades-count">${a.totalTrades ?? 0} trades</span>
+          <span class="status-pill status-${a.status}">${a.status} (${lastStr})</span>
+        </div>`;
+      }).join('');
+    }
+
     async function refreshStats() {
       const data = await fetchJSON('/api/stats');
       if (!data) return;
@@ -535,6 +575,7 @@
         refreshMarkets(),
         refreshAgents(),
         refreshLeaderboard(),
+        refreshConnectedAgents(),
         refreshActivity(),
         refreshStats(),
       ]);
@@ -544,6 +585,7 @@
       setInterval(refreshMarkets, 30000);
       setInterval(refreshAgents, 15000);
       setInterval(refreshLeaderboard, 15000);
+      setInterval(refreshConnectedAgents, 15000);
       setInterval(refreshActivity, 10000);
       setInterval(refreshStats, 30000);
     }

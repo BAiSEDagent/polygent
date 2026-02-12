@@ -58,6 +58,7 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
   };
 
   tradeStore.addOrder(order);
+  agentStore.update(agent.id, { lastActivity: Date.now() } as any);
 
   try {
     // Submit to CLOB

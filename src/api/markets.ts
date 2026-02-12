@@ -120,4 +120,19 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+/** GET /api/markets/:id/book — Full orderbook (bids/asks) */
+router.get('/:id/book', async (req: Request, res: Response) => {
+  try {
+    const orderbook = await liveDataService.getOrderBook(req.params.id);
+    if (!orderbook) {
+      res.status(404).json({ error: 'Orderbook not available for this market' });
+      return;
+    }
+    res.json({ orderbook });
+  } catch (error) {
+    logger.error('Failed to fetch orderbook', { error: (error as Error).message });
+    res.status(502).json({ error: 'Failed to fetch orderbook' });
+  }
+});
+
 export default router;

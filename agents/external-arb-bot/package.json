@@ -1,0 +1,13 @@
+{
+  "name": "external-arb-bot",
+  "version": "1.0.0",
+  "description": "Standalone arbitrage bot that finds mispriced markets via Cogent API",
+  "main": "index.ts",
+  "scripts": {
+    "start": "npx tsx index.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "external-whale-bot",
+  "version": "1.0.0",
+  "description": "Standalone whale-tracking bot that connects to Cogent via HTTP API",
+  "main": "index.ts",
+  "scripts": {
+    "start": "npx tsx index.ts",
+    "dev": "npx tsx --watch index.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

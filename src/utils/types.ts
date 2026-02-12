@@ -3,6 +3,8 @@
 export interface Agent {
   id: string;
   name: string;
+  description?: string;
+  strategy?: string;
   apiKeyHash: string;
   walletAddress: string | null;
   privateKey: string; // In production, use KMS
@@ -10,6 +12,8 @@ export interface Agent {
   status: AgentStatus;
   config: AgentConfig;
   equity: AgentEquity;
+  lastActivity?: number;
+  registeredViaApi?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -34,6 +38,8 @@ export interface AgentEquity {
 
 export interface AgentCreateRequest {
   name: string;
+  description?: string;
+  strategy?: string;
   deposit?: number;
   config?: Partial<AgentConfig>;
 }

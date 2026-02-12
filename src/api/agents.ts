@@ -8,8 +8,8 @@ import { AgentCreateRequest, AgentCreateResponse } from '../utils/types';
 
 const router = Router();
 
-/** POST /api/agents — Register a new agent */
-router.post('/', authenticateAdmin, async (req: Request, res: Response) => {
+/** POST /api/agents — Register a new agent (open registration for external agents) */
+router.post('/', async (req: Request, res: Response) => {
   try {
     const body = req.body as AgentCreateRequest;
 
@@ -34,11 +34,14 @@ router.post('/', authenticateAdmin, async (req: Request, res: Response) => {
     const agent = agentStore.create({
       id,
       name: body.name,
+      description: body.description,
+      strategy: body.strategy,
       apiKeyHash,
       privateKey: wallet.privateKey,
       walletAddress: wallet.address,
       configOverrides: body.config,
       deposit: body.deposit,
+      registeredViaApi: true,
     });
 
     logger.info(`Agent registered: ${agent.id} (${agent.name})`, {

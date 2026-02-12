@@ -6,6 +6,8 @@ import portfolioRouter from './portfolio';
 import { liveDataService } from '../core/live-data';
 import { agentRunner } from '../core/agent-runner';
 import { paperTrader } from '../core/paper-trader';
+import { agentStore } from '../models/agent';
+import { tradeStore } from '../models/trade';
 
 const router = Router();
 
@@ -59,6 +61,31 @@ router.get('/stats', (_req: Request, res: Response) => {
       totalVolume: trades.reduce((s, t) => s + t.notional, 0),
     },
   });
+});
+
+/** GET /api/connected-agents — External agents that registered via API */
+router.get('/connected-agents', (_req: Request, res: Response) => {
+  const agents = agentStore.list()
+    .filter(a => a.registeredViaApi)
+    .map(a => {
+      const trades = tradeStore.getAgentTrades(a.id, 1);
+      const pnl = a.equity.current - a.equity.deposited;
+      const idleMs = Date.now() - (a.lastActivity ?? a.createdAt);
+      const isActive = idleMs < 5 * 60_000; // active if activity in last 5 min
+      return {
+        id: a.id,
+        name: a.name,
+        description: a.description,
+        strategy: a.strategy,
+        status: isActive ? 'active' : 'idle',
+        lastActivity: a.lastActivity ?? a.createdAt,
+        pnl,
+        equity: a.equity.current,
+        totalTrades: tradeStore.getAgentTrades(a.id, 10000).length,
+        createdAt: a.createdAt,
+      };
+    });
+  res.json({ agents, total: agents.length });
 });
 
 export default router;

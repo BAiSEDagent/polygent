@@ -17,16 +17,21 @@ class AgentStore {
   create(params: {
     id: string;
     name: string;
+    description?: string;
+    strategy?: string;
     apiKeyHash: string;
     privateKey: string;
     walletAddress: string;
     configOverrides?: Partial<AgentConfig>;
     deposit?: number;
+    registeredViaApi?: boolean;
   }): Agent {
     const now = Date.now();
     const agent: Agent = {
       id: params.id,
       name: params.name,
+      description: params.description,
+      strategy: params.strategy,
       apiKeyHash: params.apiKeyHash,
       walletAddress: params.walletAddress,
       privateKey: params.privateKey,
@@ -39,6 +44,8 @@ class AgentStore {
         peakEquity: params.deposit ?? 1000,
         dailyStartEquity: params.deposit ?? 1000,
       },
+      lastActivity: now,
+      registeredViaApi: params.registeredViaApi ?? false,
       createdAt: now,
       updatedAt: now,
     };
