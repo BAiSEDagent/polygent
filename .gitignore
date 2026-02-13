@@ -4,3 +4,5 @@ dist/
 logs/
 *.log
 package-lock.json
+miniapp/.next
+miniapp/node_modules
