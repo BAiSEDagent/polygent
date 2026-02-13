@@ -6,6 +6,7 @@ import { agentStore } from '../models/agent';
 import { tradeStore } from '../models/trade';
 import { broadcastTrade } from './data-feed';
 import { Agent, Signal, Trade, Order, OrderRequest } from '../utils/types';
+import { getAgentMutex } from '../utils/mutex';
 
 /**
  * Paper Trading Engine
@@ -46,6 +47,8 @@ export interface AgentPerformance {
   depositedEquity: number;
 }
 
+const MAX_PAPER_TRADES = 50_000;
+
 class PaperTradingEngine {
   private paperTrades: PaperTrade[] = [];
   private equityHistory = new Map<string, Array<{ equity: number; timestamp: number }>>();
@@ -55,6 +58,16 @@ class PaperTradingEngine {
    * Runs through risk engine, simulates fill against orderbook, records trade.
    */
   async executeSignal(signal: Signal, agent: Agent): Promise<PaperTrade | null> {
+    const mutex = getAgentMutex(agent.id);
+    await mutex.acquire();
+    try {
+      return await this._executeSignalInner(signal, agent);
+    } finally {
+      mutex.release();
+    }
+  }
+
+  private async _executeSignalInner(signal: Signal, agent: Agent): Promise<PaperTrade | null> {
     // Build order request from signal
     const orderRequest: OrderRequest = {
       marketId: signal.marketId,
@@ -100,6 +113,9 @@ class PaperTradingEngine {
     };
 
     this.paperTrades.push(paperTrade);
+    if (this.paperTrades.length > MAX_PAPER_TRADES) {
+      this.paperTrades = this.paperTrades.slice(-MAX_PAPER_TRADES);
+    }
 
     // Also record in the main trade store (for portfolio tracking)
     const trade: Trade = {

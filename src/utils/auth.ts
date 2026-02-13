@@ -41,21 +41,30 @@ export function authenticateAgent(req: Request, res: Response, next: NextFunctio
   next();
 }
 
-/** Middleware: authenticate admin by X-Admin-Key header */
-export function authenticateAdmin(req: Request, res: Response, next: NextFunction): void {
+/** Timing-safe comparison for admin keys — constant time regardless of length */
+function safeCompareKeys(provided: string, expected: string): boolean {
+  if (typeof provided !== 'string' || typeof expected !== 'string') {
+    return false;
+  }
+  
+  // Hash both values so comparison is always fixed-length (32 bytes)
+  // This eliminates timing oracle on key length differences
+  const hashA = crypto.createHash('sha256').update(provided).digest();
+  const hashB = crypto.createHash('sha256').update(expected).digest();
+  
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
+/** Middleware: authenticate admin by X-Admin-Key header (ONLY - no agent fallback) */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const adminKey = req.header('X-Admin-Key');
   if (!adminKey) {
-    // Fall back to agent auth for endpoints that accept both
-    const apiKey = req.header('X-API-Key');
-    if (apiKey) {
-      return authenticateAgent(req, res, next);
-    }
     res.status(401).json({ error: 'Missing X-Admin-Key header' });
     return;
   }
 
   const { config } = require('../config');
-  if (adminKey !== config.ADMIN_API_KEY) {
+  if (!safeCompareKeys(adminKey, config.ADMIN_API_KEY)) {
     logger.warn('Admin authentication failed');
     res.status(401).json({ error: 'Invalid admin key' });
     return;
@@ -64,3 +73,6 @@ export function authenticateAdmin(req: Request, res: Response, next: NextFunctio
   (req as any).isAdmin = true;
   next();
 }
+
+// NOTE: authenticateAdmin with agent fallback was REMOVED (security risk — privilege escalation vector).
+// Use requireAdmin for admin routes, authenticateAgent for agent routes. Never mix auth levels.

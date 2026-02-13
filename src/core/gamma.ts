@@ -32,7 +32,14 @@ class GammaClient {
     return entry.data as T;
   }
 
+  private readonly MAX_CACHE_SIZE = 500;
+
   private setCache<T>(key: string, data: T): void {
+    // Evict oldest entries if cache is too large
+    if (this.cache.size >= this.MAX_CACHE_SIZE) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
     this.cache.set(key, { data, expiresAt: Date.now() + this.ttl });
   }
 

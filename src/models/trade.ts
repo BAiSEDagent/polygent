@@ -1,4 +1,9 @@
 import { Order, Trade, OrderStatus, Position } from '../utils/types';
+import { sanitizeObject } from '../utils/sanitize';
+
+const MAX_TRADES = 50_000;
+const MAX_PAPER_TRADES = 50_000;
+const STALE_ORDER_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 
 class TradeStore {
   private orders = new Map<string, Order>();
@@ -19,7 +24,7 @@ class TradeStore {
   updateOrder(id: string, updates: Partial<Order>): Order | undefined {
     const order = this.orders.get(id);
     if (!order) return undefined;
-    const updated = { ...order, ...updates, updatedAt: Date.now() };
+    const updated = { ...order, ...sanitizeObject(updates), updatedAt: Date.now() };
     this.orders.set(id, updated);
     return updated;
   }
@@ -43,6 +48,9 @@ class TradeStore {
 
   addTrade(trade: Trade): void {
     this.trades.push(trade);
+    if (this.trades.length > MAX_TRADES) {
+      this.trades = this.trades.slice(-MAX_TRADES);
+    }
   }
 
   getAgentTrades(agentId: string, limit = 50): Trade[] {
@@ -103,6 +111,24 @@ class TradeStore {
   getAgentMarketCount(agentId: string): number {
     const positions = this.getAgentPositions(agentId);
     return new Set(positions.map((p) => p.marketId)).size;
+  }
+
+  /** Prune stale data to prevent unbounded memory growth */
+  pruneStaleData(): void {
+    const now = Date.now();
+    // Prune filled/cancelled orders older than 24h
+    for (const [id, order] of this.orders) {
+      if (
+        (order.status === 'filled' || order.status === 'cancelled' || order.status === 'rejected') &&
+        now - order.updatedAt > STALE_ORDER_AGE_MS
+      ) {
+        this.orders.delete(id);
+      }
+    }
+    // Cap trades array
+    if (this.trades.length > MAX_TRADES) {
+      this.trades = this.trades.slice(-MAX_TRADES);
+    }
   }
 }
 

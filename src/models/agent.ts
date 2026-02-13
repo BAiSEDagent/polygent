@@ -1,5 +1,7 @@
 import { Agent, AgentConfig, AgentStatus } from '../utils/types';
 import { config } from '../config';
+import { setAgentPrivateKey } from '../core/key-store';
+import { sanitizeObject } from '../utils/sanitize';
 
 const DEFAULT_CONFIG: AgentConfig = {
   maxPositionPct: config.DEFAULT_MAX_POSITION_PCT,
@@ -34,10 +36,10 @@ class AgentStore {
       strategy: params.strategy,
       apiKeyHash: params.apiKeyHash,
       walletAddress: params.walletAddress,
-      privateKey: params.privateKey,
+      // privateKey is now stored securely in key store
       proxyWallet: null,
       status: 'active',
-      config: { ...DEFAULT_CONFIG, ...params.configOverrides },
+      config: { ...DEFAULT_CONFIG, ...(params.configOverrides ? sanitizeObject(params.configOverrides) : {}) },
       equity: {
         deposited: params.deposit ?? 1000,
         current: params.deposit ?? 1000,
@@ -49,6 +51,10 @@ class AgentStore {
       createdAt: now,
       updatedAt: now,
     };
+    
+    // Store private key securely
+    setAgentPrivateKey(agent.id, params.privateKey);
+    
     this.agents.set(agent.id, agent);
     this.apiKeyIndex.set(params.apiKeyHash, agent.id);
     return agent;
@@ -70,7 +76,7 @@ class AgentStore {
   update(id: string, updates: Partial<Agent>): Agent | undefined {
     const agent = this.agents.get(id);
     if (!agent) return undefined;
-    const updated = { ...agent, ...updates, updatedAt: Date.now() };
+    const updated = { ...agent, ...sanitizeObject(updates), updatedAt: Date.now() };
     this.agents.set(id, updated);
     return updated;
   }

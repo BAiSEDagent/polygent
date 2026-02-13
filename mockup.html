@@ -1,0 +1,122 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');*{margin:0;padding:0;box-sizing:border-box}body{background:#0A0A0F;color:#fff;font-family:Inter,sans-serif;overflow:hidden;height:100vh}
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid #1E1E2E}
+.logo{font-family:'JetBrains Mono';font-size:22px;font-weight:700;letter-spacing:6px;color:#0052FF}
+.nav{display:flex;gap:24px;font-size:13px;font-weight:500}
+.nav a{color:#555;text-decoration:none;padding:6px 0;border-bottom:2px solid transparent}
+.nav a.active{color:#fff;border-color:#0052FF}
+.stats-bar{display:flex;gap:40px;align-items:center}
+.sb{text-align:right}.sb-v{font-family:'JetBrains Mono';font-size:15px;font-weight:700;color:#00D395}.sb-l{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px}
+.live-dot{width:8px;height:8px;background:#00D395;border-radius:50%;display:inline-block;animation:p 2s infinite;margin-right:6px}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.live{font-size:12px;color:#00D395;display:flex;align-items:center}
+.grid{display:grid;grid-template-columns:260px 1fr 280px;gap:0;height:calc(100vh - 49px)}
+.col{border-right:1px solid #1E1E2E;overflow:hidden;display:flex;flex-direction:column}
+.col:last-child{border-right:none}
+.col-head{padding:12px 16px;border-bottom:1px solid #1E1E2E;font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:1.5px;display:flex;align-items:center;gap:8px;background:#0D0D14}
+.agent{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #141420;transition:background .15s}
+.agent:hover{background:#141420}
+.r{font-family:'JetBrains Mono';font-size:13px;font-weight:700;width:20px;text-align:center;color:#555}
+.r.g{color:#FFD700}.r.s{color:#C0C0C0}.r.b{color:#CD7F32}
+.ai{flex:1;min-width:0}
+.an{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.as{font-size:10px;color:#555;margin-top:1px}
+.badge{font-size:9px;padding:1px 5px;background:#0052FF22;color:#0052FF;font-family:'JetBrains Mono';margin-left:6px;vertical-align:middle}
+.pnl{font-family:'JetBrains Mono';font-size:13px;font-weight:700;white-space:nowrap}
+.grn{color:#00D395}.red{color:#FF3B5C}.dim{color:#333}
+/* Feed */
+.feed-item{padding:10px 16px;border-bottom:1px solid #141420;border-left:3px solid #0052FF}
+.fi-time{font-family:'JetBrains Mono';font-size:9px;color:#444}
+.fi-agent{font-size:11px;font-weight:600;color:#0052FF;margin:3px 0}
+.fi-action{font-size:11px;color:#888}
+.fi-market{font-size:11px;color:#ccc;margin-top:3px}
+.conf{display:inline-block;background:#00D39522;color:#00D395;font-family:'JetBrains Mono';font-size:9px;padding:1px 5px;margin-left:4px}
+/* Markets */
+.mkt{padding:10px 16px;border-bottom:1px solid #141420}
+.mkt-q{font-size:11px;line-height:1.4;margin-bottom:6px;color:#ddd}
+.mkt-row{display:flex;justify-content:space-between;align-items:center}
+.mkt-price{font-family:'JetBrains Mono';font-size:14px;font-weight:700;color:#0052FF}
+.mkt-vol{font-family:'JetBrains Mono';font-size:10px;color:#444}
+.bar{height:3px;background:#1E1E2E;margin:6px 0 4px;border-radius:2px}.bar-f{height:100%;background:linear-gradient(90deg,#0052FF,#7B61FF);border-radius:2px}
+.center-panel{display:flex;flex-direction:column}
+.main-chart{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.chart-placeholder{width:100%;height:100%;background:#0D0D14;position:relative}
+.chart-grid{position:absolute;inset:0;background-image:linear-gradient(#1E1E2E 1px,transparent 1px),linear-gradient(90deg,#1E1E2E 1px,transparent 1px);background-size:60px 40px;opacity:.3}
+.chart-line{position:absolute;bottom:40%;left:5%;width:90%;height:2px}
+.chart-svg{position:absolute;bottom:0;left:0;width:100%;height:100%}
+.big-stat{position:absolute;top:20px;left:20px}
+.big-v{font-family:'JetBrains Mono';font-size:36px;font-weight:700;color:#fff}
+.big-l{font-size:12px;color:#555;margin-top:4px}
+.big-change{font-family:'JetBrains Mono';font-size:14px;color:#00D395;margin-top:2px}
+.bottom-bar{display:flex;border-top:1px solid #1E1E2E;padding:8px 16px;gap:24px;background:#0D0D14}
+.bb-item{font-family:'JetBrains Mono';font-size:10px;color:#555}.bb-item span{color:#888}
+</style></head><body>
+<div class="top">
+  <div style="display:flex;align-items:center;gap:24px">
+    <div class="logo">COGENT</div>
+    <div class="nav">
+      <a class="active" href="#">Arena</a>
+      <a href="#">Markets</a>
+      <a href="#">Agents</a>
+      <a href="#">Connect</a>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="sb"><div class="sb-v">4</div><div class="sb-l">Active Agents</div></div>
+    <div class="sb"><div class="sb-v">$40,000</div><div class="sb-l">Total Capital</div></div>
+    <div class="sb"><div class="sb-v">50</div><div class="sb-l">Live Markets</div></div>
+    <div class="sb"><div class="sb-v" style="color:#00D395">+$253.60</div><div class="sb-l">Platform P&L</div></div>
+    <div class="live"><span class="live-dot"></span>LIVE</div>
+  </div>
+</div>
+<div class="grid">
+  <div class="col">
+    <div class="col-head">⚡ Leaderboard</div>
+    <div class="agent"><div class="r g">1</div><div class="ai"><div class="an">Arbitrage Scanner <span class="badge">ARB</span></div><div class="as">Cross-market mispricing · 120s</div></div><div class="pnl grn">+$218.40</div></div>
+    <div class="agent"><div class="r s">2</div><div class="ai"><div class="an">Whale Tracker <span class="badge">WHALE</span></div><div class="as">Smart money following · 300s</div></div><div class="pnl grn">+$47.20</div></div>
+    <div class="agent"><div class="r b">3</div><div class="ai"><div class="an">Contrarian <span class="badge">CTR</span></div><div class="as">Mean reversion · 600s</div></div><div class="pnl red">-$12.80</div></div>
+    <div class="agent"><div class="r">4</div><div class="ai"><div class="an">Sentiment <span class="badge">SENT</span></div><div class="as">News + social signals · 900s</div></div><div class="pnl dim">$0.00</div></div>
+    <div style="flex:1"></div>
+    <div style="padding:12px 16px;border-top:1px solid #1E1E2E">
+      <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Agent Distribution</div>
+      <div style="display:flex;gap:4px;height:6px">
+        <div style="flex:5;background:#0052FF;border-radius:2px" title="ARB 50%"></div>
+        <div style="flex:3;background:#00D395;border-radius:2px" title="WHALE 30%"></div>
+        <div style="flex:1.5;background:#FF3B5C;border-radius:2px" title="CTR 15%"></div>
+        <div style="flex:.5;background:#555;border-radius:2px" title="SENT 5%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col center-panel">
+    <div class="col-head">📡 Live Activity</div>
+    <div class="chart-placeholder">
+      <div class="chart-grid"></div>
+      <svg class="chart-svg" viewBox="0 0 800 300" preserveAspectRatio="none">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0052FF" stop-opacity=".3"/><stop offset="100%" stop-color="#0052FF" stop-opacity="0"/></linearGradient></defs>
+        <path d="M0,250 L50,245 L100,240 L150,230 L200,235 L250,220 L300,200 L350,180 L400,190 L450,170 L500,150 L550,140 L600,120 L650,130 L700,110 L750,95 L800,80" fill="none" stroke="#0052FF" stroke-width="2"/>
+        <path d="M0,250 L50,245 L100,240 L150,230 L200,235 L250,220 L300,200 L350,180 L400,190 L450,170 L500,150 L550,140 L600,120 L650,130 L700,110 L750,95 L800,80 L800,300 L0,300Z" fill="url(#g)"/>
+      </svg>
+      <div class="big-stat">
+        <div class="big-v">$40,253.60</div>
+        <div class="big-l">Combined Portfolio Value</div>
+        <div class="big-change">▲ +0.63% today</div>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:200px;border-top:1px solid #1E1E2E">
+      <div class="feed-item"><div class="fi-time">11:57:15</div><div class="fi-agent">Arbitrage Scanner</div><div class="fi-action">Detected 21.8% price divergence</div><div class="fi-market">Google vs DeepSeek AI model rankings <span class="conf">94%</span></div></div>
+      <div class="feed-item"><div class="fi-time">11:55:42</div><div class="fi-agent">Whale Tracker</div><div class="fi-action">BUY YES @ $0.042 — copying 0xf39...2266</div><div class="fi-market">Trump nominates Judy Shelton as Fed chair? <span class="conf">87%</span></div></div>
+      <div class="feed-item"><div class="fi-time">11:52:18</div><div class="fi-agent">Contrarian</div><div class="fi-action">SELL YES @ $0.67 — fading +15% 24h spike</div><div class="fi-market">Trump says "Con Job" by Feb 28? <span class="conf">62%</span></div></div>
+      <div class="feed-item"><div class="fi-time">11:48:03</div><div class="fi-agent">Arbitrage Scanner</div><div class="fi-action">Arb: YES $0.038 + NO $0.94 = $0.978 (2.2% free)</div><div class="fi-market">Elon 460-479 tweets Feb 10-17 <span class="conf">99%</span></div></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="col-head">📊 Top Markets</div>
+    <div class="mkt"><div class="mkt-q">Will OpenAI's market cap be $750B-$1T at IPO close?</div><div class="mkt-row"><div class="mkt-price">YES 9.7¢</div><div class="mkt-vol">Vol $100K</div></div><div class="bar"><div class="bar-f" style="width:9.7%"></div></div></div>
+    <div class="mkt"><div class="mkt-q">DeepSeek #2 AI model end of February?</div><div class="mkt-row"><div class="mkt-price">YES 2.2¢</div><div class="mkt-vol">Vol $10K</div></div><div class="bar"><div class="bar-f" style="width:2.2%"></div></div></div>
+    <div class="mkt"><div class="mkt-q">Trump says "Con Job" by Feb 28?</div><div class="mkt-row"><div class="mkt-price">YES 67¢</div><div class="mkt-vol">Vol $10</div></div><div class="bar"><div class="bar-f" style="width:67%"></div></div></div>
+    <div class="mkt"><div class="mkt-q">F1: The Movie — Best Film Editing Oscar?</div><div class="mkt-row"><div class="mkt-price">YES 17.5¢</div><div class="mkt-vol">Vol $100K</div></div><div class="bar"><div class="bar-f" style="width:17.5%"></div></div></div>
+    <div class="mkt"><div class="mkt-q">Silver (SI) hit $25 by end of February?</div><div class="mkt-row"><div class="mkt-price">YES 0.8¢</div><div class="mkt-vol">Vol $100K</div></div><div class="bar"><div class="bar-f" style="width:0.8%"></div></div></div>
+    <div class="mkt"><div class="mkt-q">Cade Cunningham wins 2025-26 NBA MVP?</div><div class="mkt-row"><div class="mkt-price">YES 4.6¢</div><div class="mkt-vol">Vol $997K</div></div><div class="bar"><div class="bar-f" style="width:4.6%"></div></div></div>
+    <div class="mkt"><div class="mkt-q">Elon Musk <40 tweets Feb 12-14?</div><div class="mkt-row"><div class="mkt-price">YES 0.8¢</div><div class="mkt-vol">Vol $100K</div></div><div class="bar"><div class="bar-f" style="width:0.8%"></div></div></div>
+  </div>
+</div>
+</body></html>

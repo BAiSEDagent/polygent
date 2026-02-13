@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { agentStore } from '../models/agent';
+import { getAgentPrivateKey } from './key-store';
 
 /**
  * Wallet provisioning for Cogent agents.
@@ -29,7 +30,11 @@ export function generateWallet(): WalletInfo {
 export function getAgentWallet(agentId: string): ethers.Wallet | null {
   const agent = agentStore.get(agentId);
   if (!agent) return null;
-  return new ethers.Wallet(agent.privateKey);
+  
+  const privateKey = getAgentPrivateKey(agentId);
+  if (!privateKey) return null;
+  
+  return new ethers.Wallet(privateKey);
 }
 
 /**
@@ -64,7 +69,9 @@ export async function deployProxyWallet(agentId: string): Promise<string> {
     });
 
     if (!response.ok) {
-      // For development: use the EOA address as a stand-in
+      if (config.NODE_ENV === 'production') {
+        throw new Error(`Proxy wallet deployment failed for agent ${agentId}. Cannot trade without proxy wallet in production.`);
+      }
       logger.warn(`Relayer unavailable, using EOA address as proxy wallet for ${agentId}`);
       const proxyAddress = agent.walletAddress!;
       agentStore.update(agentId, { proxyWallet: proxyAddress });
@@ -79,7 +86,9 @@ export async function deployProxyWallet(agentId: string): Promise<string> {
 
     return proxyAddress;
   } catch (error) {
-    // Fallback for development
+    if (config.NODE_ENV === 'production') {
+      throw new Error(`Proxy wallet deployment failed for agent ${agentId}. Cannot trade without proxy wallet in production.`);
+    }
     logger.warn(`Proxy wallet deployment failed, using EOA as fallback`, {
       agentId,
       error: (error as Error).message,

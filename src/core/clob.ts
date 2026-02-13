@@ -67,10 +67,46 @@ class CLOBClient {
   /** Place an order on the CLOB */
   async placeOrder(
     agentId: string,
-    request: OrderRequest
+    request: OrderRequest,
+    maxSlippage: number = 0.02 // Default 2% slippage protection
   ): Promise<{ orderId: string; status: string }> {
     // Ensure proxy wallet is deployed
     const proxyWallet = await deployProxyWallet(agentId);
+
+    // Check slippage protection for limit orders
+    if (request.type !== 'MARKET') {
+      try {
+        const currentMidpoint = await this.getMidpoint(request.marketId);
+        const priceDiff = Math.abs(request.price - currentMidpoint);
+        const slippagePct = priceDiff / currentMidpoint;
+        
+        if (slippagePct > maxSlippage) {
+          throw new Error(
+            `Order rejected: price ${request.price} differs by ${(slippagePct * 100).toFixed(2)}% ` +
+            `from current midpoint ${currentMidpoint.toFixed(4)}, exceeds max slippage of ${(maxSlippage * 100).toFixed(2)}%`
+          );
+        }
+        
+        logger.debug(`Slippage check passed`, {
+          agentId,
+          requestedPrice: request.price,
+          currentMidpoint,
+          slippagePct: (slippagePct * 100).toFixed(2) + '%',
+          maxSlippage: (maxSlippage * 100).toFixed(2) + '%'
+        });
+      } catch (slippageError) {
+        const error = slippageError as Error;
+        if (error.message && error.message.includes('Order rejected: price')) {
+          throw error; // Re-throw slippage rejections
+        }
+        // If we can't get current price, reject the order — safety fails closed
+        logger.error('Cannot verify slippage protection — rejecting order for safety', {
+          agentId,
+          error: error.message || 'Unknown error'
+        });
+        throw new Error('Order rejected: unable to verify slippage protection. Market data unavailable.');
+      }
+    }
 
     logger.info(`Placing order on CLOB`, {
       agentId,

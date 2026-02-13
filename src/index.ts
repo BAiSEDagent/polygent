@@ -27,8 +27,38 @@ const startTime = Date.now();
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+
+// Secure CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://localhost:3000',
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
+];
+
+app.use(cors({
+  origin: (origin: string | undefined, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests) in dev
+    if (!origin && config.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    if (origin && allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else if (!origin) {
+      if (config.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Origin header required'));
+      }
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
+// Reduce JSON body size limit to 100KB for security
+app.use(express.json({ limit: '100kb' }));
 
 app.use(
   '/api/',
@@ -135,16 +165,31 @@ async function bootstrap(): Promise<void> {
   await agentRunner.start();
 
   // 5. Start Express server
-  server.listen(config.PORT, () => {
+  const bindHost = process.env.BIND_ALL === 'true' ? '0.0.0.0' : '127.0.0.1';
+  server.listen(config.PORT, bindHost, () => {
     logger.info('─'.repeat(60));
-    logger.info(`🚀 Server running on port ${config.PORT}`);
+    logger.info(`🚀 Server running on ${bindHost}:${config.PORT}`);
     logger.info(`📊 Dashboard: http://localhost:${config.PORT}/`);
     logger.info(`🔌 WebSocket: ws://localhost:${config.PORT}/ws/feed`);
     logger.info(`💚 Health: http://localhost:${config.PORT}/health`);
     logger.info(`📡 API: http://localhost:${config.PORT}/api/`);
+    if (bindHost === '127.0.0.1') {
+      logger.info('🔒 Bound to localhost only - set BIND_ALL=true to bind to all interfaces');
+    }
     logger.info('─'.repeat(60));
   });
 }
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Promise Rejection', { reason: String(reason) });
+  // Don't crash — log and continue
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception — shutting down', { error: error.message, stack: error.stack });
+  // Graceful shutdown
+  shutdown().then(() => process.exit(1));
+});
 
 bootstrap().catch((err) => {
   logger.error('Bootstrap failed', { error: err.message, stack: err.stack });

@@ -58,12 +58,15 @@ class LiveDataService extends EventEmitter {
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
+  private reconnectAttempts = 0;
 
   private readonly MARKET_TTL = 60_000;       // 60s
   private readonly ORDERBOOK_TTL = 10_000;    // 10s
   private readonly POLL_INTERVAL = 60_000;    // 60s
-  private readonly WS_RECONNECT_DELAY = 5_000;
+  private readonly WS_RECONNECT_BASE_DELAY = 1_000;  // Start at 1s
+  private readonly WS_RECONNECT_MAX_DELAY = 60_000;  // Max 60s
   private readonly MAX_PRICE_HISTORY = 100;
+  private readonly MAX_CACHE_SIZE = 200;
   private readonly CLOB_WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 
   /** Start the live data service */
@@ -149,6 +152,11 @@ class LiveDataService extends EventEmitter {
         timestamp: Date.now(),
       };
 
+      // Evict oldest if cache is too large
+      if (this.orderbookCache.size >= this.MAX_CACHE_SIZE) {
+        const firstKey = this.orderbookCache.keys().next().value;
+        if (firstKey) this.orderbookCache.delete(firstKey);
+      }
       this.orderbookCache.set(tokenId, {
         data: orderbook,
         expiresAt: Date.now() + this.ORDERBOOK_TTL,
@@ -258,6 +266,7 @@ class LiveDataService extends EventEmitter {
 
       this.wsConnection.on('open', () => {
         logger.info('🔌 CLOB WebSocket connected');
+        this.reconnectAttempts = 0; // Reset on successful connection
         // Re-subscribe to all tracked tokens
         if (this.wsSubscriptions.size > 0) {
           this.sendWsSubscribe(Array.from(this.wsSubscriptions));
@@ -290,10 +299,24 @@ class LiveDataService extends EventEmitter {
 
   private scheduleReconnect(): void {
     if (!this.running || this.reconnectTimer) return;
+    
+    // Exponential backoff with jitter
+    const baseDelay = this.WS_RECONNECT_BASE_DELAY * Math.pow(2, this.reconnectAttempts);
+    const cappedDelay = Math.min(baseDelay, this.WS_RECONNECT_MAX_DELAY);
+    const jitter = Math.random() * 1000; // Add up to 1s jitter
+    const delay = cappedDelay + jitter;
+    
+    this.reconnectAttempts++;
+    
+    logger.debug(`Scheduling CLOB WS reconnect`, {
+      attempt: this.reconnectAttempts,
+      delayMs: Math.round(delay)
+    });
+    
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connectWebSocket();
-    }, this.WS_RECONNECT_DELAY);
+    }, delay);
   }
 
   private sendWsSubscribe(tokenIds: string[]): void {

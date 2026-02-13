@@ -30,7 +30,7 @@ function makeAgent(overrides?: {
     name: 'test-agent',
     apiKeyHash: 'hash',
     walletAddress: '0x1234',
-    privateKey: '0xkey',
+    // privateKey is now stored securely in key store
     proxyWallet: null,
     status: (overrides?.status as any) ?? 'active',
     config: {

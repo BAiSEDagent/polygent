@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticateAgent, authenticateAdmin } from '../utils/auth';
+import { authenticateAgent, requireAdmin } from '../utils/auth';
 import { agentStore } from '../models/agent';
 import { tradeStore } from '../models/trade';
 import { gammaClient } from '../core/gamma';
@@ -62,7 +62,7 @@ router.get('/leaderboard', async (_req: Request, res: Response) => {
 });
 
 /** GET /api/portfolio/:agentId — Get agent portfolio with P&L (admin) */
-router.get('/:agentId', authenticateAdmin, async (req: Request, res: Response) => {
+router.get('/:agentId', requireAdmin, async (req: Request, res: Response) => {
   const agent = agentStore.get(req.params.agentId);
   if (!agent) {
     res.status(404).json({ error: 'Agent not found' });
@@ -78,7 +78,7 @@ router.get('/:agentId', authenticateAdmin, async (req: Request, res: Response) =
 });
 
 /** GET /api/portfolio/:agentId/history — Trade history (admin) */
-router.get('/:agentId/history', authenticateAdmin, (req: Request, res: Response) => {
+router.get('/:agentId/history', requireAdmin, (req: Request, res: Response) => {
   const agent = agentStore.get(req.params.agentId);
   if (!agent) {
     res.status(404).json({ error: 'Agent not found' });

@@ -8,6 +8,7 @@ import { agentRunner } from '../core/agent-runner';
 import { paperTrader } from '../core/paper-trader';
 import { agentStore } from '../models/agent';
 import { tradeStore } from '../models/trade';
+import { authenticateAgent, requireAdmin } from '../utils/auth';
 
 const router = Router();
 
@@ -18,15 +19,15 @@ router.use('/portfolio', portfolioRouter);
 
 // ─── Live Agent Endpoints ────────────────────────────────────────────────────
 
-/** GET /api/runners — Get all registered agent runners with live stats */
-router.get('/runners', (_req: Request, res: Response) => {
+/** GET /api/runners — Get all registered agent runners with live stats (requires auth) */
+router.get('/runners', authenticateAgent, (_req: Request, res: Response) => {
   const agents = agentRunner.getAgents();
   res.json({ agents, total: agents.length });
 });
 
-/** GET /api/runners/:id/trades — Paper trade history for an agent */
-router.get('/runners/:id/trades', (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string) || 50;
+/** GET /api/runners/:id/trades — Paper trade history for an agent (requires auth) */
+router.get('/runners/:id/trades', authenticateAgent, (req: Request, res: Response) => {
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
   const trades = paperTrader.getAgentTrades(req.params.id, limit);
   res.json({ trades, total: trades.length });
 });
@@ -37,9 +38,9 @@ router.get('/leaderboard', (_req: Request, res: Response) => {
   res.json({ leaderboard, total: leaderboard.length });
 });
 
-/** GET /api/activity — Recent agent activity feed */
-router.get('/activity', (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string) || 50;
+/** GET /api/activity — Recent agent activity feed (requires auth) */
+router.get('/activity', authenticateAgent, (req: Request, res: Response) => {
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
   const activity = agentRunner.getActivity(limit);
   res.json({ activity, total: activity.length });
 });
@@ -63,8 +64,8 @@ router.get('/stats', (_req: Request, res: Response) => {
   });
 });
 
-/** GET /api/connected-agents — External agents that registered via API */
-router.get('/connected-agents', (_req: Request, res: Response) => {
+/** GET /api/connected-agents — External agents that registered via API (requires auth) */
+router.get('/connected-agents', requireAdmin, (_req: Request, res: Response) => {
   const agents = agentStore.list()
     .filter(a => a.registeredViaApi)
     .map(a => {

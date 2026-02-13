@@ -42,6 +42,8 @@ class AgentRunner extends EventEmitter {
   private readonly MAX_ACTIVITY_LOG = 500;
   private readonly DEFAULT_INTERVAL_MS = 5 * 60_000; // 5 minutes
   private readonly TICK_INTERVAL_MS = 30_000; // Check every 30s
+  private lastPruneTime = 0;
+  private readonly PRUNE_INTERVAL_MS = 5 * 60_000; // 5 minutes
 
   /** Register a strategy agent */
   registerAgent(
@@ -49,11 +51,22 @@ class AgentRunner extends EventEmitter {
     strategy: Strategy,
     options?: { deposit?: number; intervalMs?: number }
   ): Agent {
+    // Production guard: refuse to use dummy private keys
+    const dummyPrivateKey = '0x0000000000000000000000000000000000000000000000000000000000000001';
+    const { config } = require('../config');
+    
+    if (config.NODE_ENV === 'production') {
+      throw new Error(
+        'Cannot create internal agents with dummy private keys in production mode. ' +
+        'Internal agents should not be used with real money trading.'
+      );
+    }
+    
     const agent = agentStore.create({
       id: `agent_${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`,
       name,
       apiKeyHash: `internal_${name}`,
-      privateKey: '0x0000000000000000000000000000000000000000000000000000000000000001', // Paper only
+      privateKey: dummyPrivateKey, // Paper only - production guard above prevents real use
       walletAddress: '0x0000000000000000000000000000000000000000',
       deposit: options?.deposit ?? 10_000, // $10K paper money
       configOverrides: {
@@ -183,6 +196,13 @@ class AgentRunner extends EventEmitter {
     if (!this.running) return;
 
     const now = Date.now();
+
+    // Periodic pruning of stale data to prevent memory leaks
+    if (now - this.lastPruneTime > this.PRUNE_INTERVAL_MS) {
+      this.lastPruneTime = now;
+      tradeStore.pruneStaleData();
+    }
+
     const markets = liveDataService.getTopMarkets(30);
 
     if (markets.length === 0) {

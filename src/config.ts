@@ -9,16 +9,46 @@ function env(key: string, fallback?: string): string {
   return value;
 }
 
+function generateRandomKey(): string {
+  const crypto = require('crypto');
+  return `dev_${crypto.randomBytes(32).toString('hex')}`;
+}
+
 function envNum(key: string, fallback: number): number {
   const raw = process.env[key];
   return raw !== undefined ? Number(raw) : fallback;
+}
+
+// Admin API key configuration with security checks
+function getAdminApiKey(): string {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const adminKey = process.env.ADMIN_API_KEY;
+  
+  if (nodeEnv === 'production') {
+    if (!adminKey || adminKey === 'dev-admin-key') {
+      throw new Error(
+        'ADMIN_API_KEY must be set to a secure value in production. ' +
+        'Cannot use default "dev-admin-key" in production mode.'
+      );
+    }
+    return adminKey;
+  }
+  
+  // Development mode: generate random key if not set
+  if (!adminKey || adminKey === 'dev-admin-key') {
+    const randomKey = generateRandomKey();
+    console.log(`🔑 Dev admin key: ${randomKey.slice(0, 8)}...`);
+    return randomKey;
+  }
+  
+  return adminKey;
 }
 
 export const config = {
   // Server
   PORT: envNum('PORT', 3000),
   NODE_ENV: env('NODE_ENV', 'development'),
-  ADMIN_API_KEY: env('ADMIN_API_KEY', 'dev-admin-key'),
+  ADMIN_API_KEY: getAdminApiKey(),
 
   // Polymarket CLOB
   POLYMARKET_CLOB_URL: env('POLYMARKET_CLOB_URL', 'https://clob.polymarket.com'),

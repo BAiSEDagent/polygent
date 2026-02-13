@@ -8,6 +8,7 @@ import { tradeStore } from '../models/trade';
 import { agentStore } from '../models/agent';
 import { broadcastTrade } from '../core/data-feed';
 import { Agent, Order, OrderRequest, Trade } from '../utils/types';
+import { getAgentMutex } from '../utils/mutex';
 
 const router = Router();
 
@@ -23,95 +24,105 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
     return;
   }
 
-  // Run risk checks
-  const riskResult = evaluateRisk(agent, body);
-  if (!riskResult.approved) {
-    logger.warn(`Order rejected by risk engine`, {
-      agentId: agent.id,
-      rule: (riskResult as any).rule,
-      reason: (riskResult as any).reason,
-    });
-    res.status(403).json({
-      error: 'Order rejected by risk engine',
-      rule: (riskResult as any).rule,
-      reason: (riskResult as any).reason,
-    });
-    return;
-  }
-
-  // Create order record
-  const orderId = `ord_${uuid().replace(/-/g, '').slice(0, 16)}`;
-  const order: Order = {
-    id: orderId,
-    agentId: agent.id,
-    marketId: body.marketId,
-    side: body.side,
-    outcome: body.outcome,
-    amount: body.amount,
-    price: body.price,
-    type: body.type ?? 'LIMIT',
-    status: 'pending',
-    filledAmount: 0,
-    clobOrderId: null,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-
-  tradeStore.addOrder(order);
-  agentStore.update(agent.id, { lastActivity: Date.now() } as any);
-
+  // Acquire per-agent mutex to prevent race conditions
+  const mutex = getAgentMutex(agent.id);
+  await mutex.acquire();
+  
   try {
-    // Submit to CLOB
-    const result = await clobClient.placeOrder(agent.id, body);
+    // Run risk checks under mutex protection
+    const riskResult = evaluateRisk(agent, body);
+    if (!riskResult.approved) {
+      logger.warn(`Order rejected by risk engine`, {
+        agentId: agent.id,
+        rule: (riskResult as any).rule,
+        reason: (riskResult as any).reason,
+      });
+      res.status(403).json({
+        error: 'Order rejected by risk engine',
+        rule: (riskResult as any).rule,
+        reason: (riskResult as any).reason,
+      });
+      return;
+    }
 
-    // Update order with CLOB response
-    tradeStore.updateOrder(orderId, {
-      clobOrderId: result.orderId,
-      status: 'open',
-    });
-
-    // Record trade
-    const trade: Trade = {
-      id: `trd_${uuid().replace(/-/g, '').slice(0, 16)}`,
-      orderId,
+    // Create order record
+    const orderId = `ord_${uuid().replace(/-/g, '').slice(0, 16)}`;
+    const order: Order = {
+      id: orderId,
       agentId: agent.id,
       marketId: body.marketId,
       side: body.side,
       outcome: body.outcome,
       amount: body.amount,
       price: body.price,
-      timestamp: Date.now(),
+      type: body.type ?? 'LIMIT',
+      status: 'pending',
+      filledAmount: 0,
+      clobOrderId: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
-    tradeStore.addTrade(trade);
 
-    // Broadcast trade event
-    broadcastTrade({
-      agentId: agent.id,
-      marketId: body.marketId,
-      side: body.side,
-      outcome: body.outcome,
-      amount: body.amount,
-      price: body.price,
-    });
+    tradeStore.addOrder(order);
+    agentStore.update(agent.id, { lastActivity: Date.now() } as any);
 
-    logger.info(`Order placed: ${orderId}`, {
-      agentId: agent.id,
-      clobOrderId: result.orderId,
-    });
+    try {
+      // Submit to CLOB with slippage protection
+      const maxSlippage = typeof body.maxSlippage === 'number' ? body.maxSlippage : 0.02; // Default 2%
+      const result = await clobClient.placeOrder(agent.id, body, maxSlippage);
 
-    res.status(201).json({
-      orderId,
-      clobOrderId: result.orderId,
-      status: 'open',
-    });
-  } catch (error) {
-    tradeStore.updateOrder(orderId, { status: 'rejected' });
-    logger.error(`Order submission failed`, {
-      agentId: agent.id,
-      orderId,
-      error: (error as Error).message,
-    });
-    res.status(502).json({ error: 'Failed to submit order to CLOB' });
+      // Update order with CLOB response
+      tradeStore.updateOrder(orderId, {
+        clobOrderId: result.orderId,
+        status: 'open',
+      });
+
+      // Record trade
+      const trade: Trade = {
+        id: `trd_${uuid().replace(/-/g, '').slice(0, 16)}`,
+        orderId,
+        agentId: agent.id,
+        marketId: body.marketId,
+        side: body.side,
+        outcome: body.outcome,
+        amount: body.amount,
+        price: body.price,
+        timestamp: Date.now(),
+      };
+      tradeStore.addTrade(trade);
+
+      // Broadcast trade event
+      broadcastTrade({
+        agentId: agent.id,
+        marketId: body.marketId,
+        side: body.side,
+        outcome: body.outcome,
+        amount: body.amount,
+        price: body.price,
+      });
+
+      logger.info(`Order placed: ${orderId}`, {
+        agentId: agent.id,
+        clobOrderId: result.orderId,
+      });
+
+      res.status(201).json({
+        orderId,
+        clobOrderId: result.orderId,
+        status: 'open',
+      });
+    } catch (error) {
+      tradeStore.updateOrder(orderId, { status: 'rejected' });
+      logger.error(`Order submission failed`, {
+        agentId: agent.id,
+        orderId,
+        error: (error as Error).message,
+      });
+      res.status(502).json({ error: 'Failed to submit order to CLOB' });
+    }
+  } finally {
+    // Always release the mutex
+    mutex.release();
   }
 });
 
@@ -160,9 +171,10 @@ function validateOrderRequest(body: OrderRequest): string | null {
   if (!body.marketId) return 'marketId is required';
   if (!body.side || !['BUY', 'SELL'].includes(body.side)) return 'side must be BUY or SELL';
   if (!body.outcome || !['YES', 'NO'].includes(body.outcome)) return 'outcome must be YES or NO';
-  if (typeof body.amount !== 'number' || body.amount <= 0) return 'amount must be a positive number';
+  if (typeof body.amount !== 'number' || body.amount <= 0 || body.amount > 1_000_000) return 'amount must be between 0 and 1,000,000';
   if (typeof body.price !== 'number' || body.price < 0 || body.price > 1) return 'price must be between 0 and 1';
   if (body.type && !['LIMIT', 'MARKET', 'FOK'].includes(body.type)) return 'type must be LIMIT, MARKET, or FOK';
+  if (body.maxSlippage !== undefined && (typeof body.maxSlippage !== 'number' || body.maxSlippage < 0 || body.maxSlippage > 0.50)) return 'maxSlippage must be between 0 and 0.50 (50%)';
   return null;
 }
 

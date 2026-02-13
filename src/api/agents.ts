@@ -1,15 +1,28 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
+import rateLimit from 'express-rate-limit';
 import { agentStore } from '../models/agent';
 import { generateWallet } from '../core/wallet';
-import { generateApiKey, hashApiKey, authenticateAdmin } from '../utils/auth';
+import { generateApiKey, hashApiKey, requireAdmin } from '../utils/auth';
 import { logger } from '../utils/logger';
 import { AgentCreateRequest, AgentCreateResponse } from '../utils/types';
 
 const router = Router();
 
-/** POST /api/agents — Register a new agent (open registration for external agents) */
-router.post('/', async (req: Request, res: Response) => {
+// Agent registration rate limit: 5 registrations per hour per IP
+const registrationRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { error: 'Agent registration rate limit exceeded. Try again in an hour.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Max agent count limit
+const MAX_AGENT_COUNT = 100;
+
+/** POST /api/agents — Register a new agent (requires admin API key) */
+router.post('/', registrationRateLimit, requireAdmin, async (req: Request, res: Response) => {
   try {
     const body = req.body as AgentCreateRequest;
 
@@ -18,10 +31,32 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
+    // Sanitize string inputs — strip HTML/script tags, enforce length limits
+    const name = body.name.replace(/<[^>]*>/g, '').trim().slice(0, 100);
+    const description = body.description
+      ? String(body.description).replace(/<[^>]*>/g, '').trim().slice(0, 500)
+      : undefined;
+    const strategy = body.strategy
+      ? String(body.strategy).replace(/<[^>]*>/g, '').trim().slice(0, 100)
+      : undefined;
+
+    if (!name) {
+      res.status(400).json({ error: 'name cannot be empty after sanitization' });
+      return;
+    }
+
+    // Check agent count limit
+    if (agentStore.count() >= MAX_AGENT_COUNT) {
+      res.status(429).json({ 
+        error: `Maximum agent limit of ${MAX_AGENT_COUNT} reached` 
+      });
+      return;
+    }
+
     // Check for duplicate name
-    const existing = agentStore.list().find((a) => a.name === body.name);
+    const existing = agentStore.list().find((a) => a.name === name);
     if (existing) {
-      res.status(409).json({ error: `Agent with name '${body.name}' already exists` });
+      res.status(409).json({ error: `Agent with name '${name}' already exists` });
       return;
     }
 
@@ -33,9 +68,9 @@ router.post('/', async (req: Request, res: Response) => {
 
     const agent = agentStore.create({
       id,
-      name: body.name,
-      description: body.description,
-      strategy: body.strategy,
+      name,
+      description,
+      strategy,
       apiKeyHash,
       privateKey: wallet.privateKey,
       walletAddress: wallet.address,
@@ -65,7 +100,7 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 /** GET /api/agents — List all agents */
-router.get('/', authenticateAdmin, (_req: Request, res: Response) => {
+router.get('/', requireAdmin, (_req: Request, res: Response) => {
   const agents = agentStore.list().map((a) => ({
     id: a.id,
     name: a.name,
@@ -80,7 +115,7 @@ router.get('/', authenticateAdmin, (_req: Request, res: Response) => {
 });
 
 /** GET /api/agents/:id — Get agent details */
-router.get('/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.get('/:id', requireAdmin, (req: Request, res: Response) => {
   const agent = agentStore.get(req.params.id);
   if (!agent) {
     res.status(404).json({ error: 'Agent not found' });
@@ -100,7 +135,7 @@ router.get('/:id', authenticateAdmin, (req: Request, res: Response) => {
 });
 
 /** DELETE /api/agents/:id — Deactivate agent */
-router.delete('/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
   const agent = agentStore.deactivate(req.params.id);
   if (!agent) {
     res.status(404).json({ error: 'Agent not found' });
@@ -111,7 +146,7 @@ router.delete('/:id', authenticateAdmin, (req: Request, res: Response) => {
 });
 
 /** POST /api/agents/:id/reset — Reset circuit breaker */
-router.post('/:id/reset', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/:id/reset', requireAdmin, (req: Request, res: Response) => {
   const agent = agentStore.resetCircuitBreak(req.params.id);
   if (!agent) {
     res.status(404).json({ error: 'Agent not found or not in circuit_break state' });

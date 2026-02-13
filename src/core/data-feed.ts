@@ -3,6 +3,8 @@ import { Server } from 'http';
 import { logger } from '../utils/logger';
 import { gammaClient } from './gamma';
 import { WSMessage } from '../utils/types';
+import { hashApiKey } from '../utils/auth';
+import { agentStore } from '../models/agent';
 
 /**
  * WebSocket data feed — relays market data to connected agents.
@@ -16,21 +18,69 @@ import { WSMessage } from '../utils/types';
 interface ClientState {
   subscriptions: Set<string>;
   alive: boolean;
+  ip: string;
+  authenticated: boolean;
+  agentId?: string;
 }
+
+// Connection limits
+const MAX_CONNECTIONS = 100;
+const MAX_CONNECTIONS_PER_IP = 5;
+const MAX_SUBSCRIPTIONS_PER_CLIENT = 50;
+const MAX_WS_MESSAGE_SIZE = 4096;
+const VALID_CHANNEL_PATTERN = /^(markets|trades|prices:[a-zA-Z0-9_-]+)$/;
 
 let wss: WebSocketServer;
 const clients = new Map<WebSocket, ClientState>();
+const connectionsByIp = new Map<string, number>();
 let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
 export function initDataFeed(server: Server): WebSocketServer {
-  wss = new WebSocketServer({ server, path: '/ws/feed' });
+  wss = new WebSocketServer({ 
+    server, 
+    path: '/ws/feed',
+    verifyClient: (info: { req: any }) => {
+      const clientIp = info.req.socket.remoteAddress || 'unknown';
+      
+      // Check global connection limit
+      if (clients.size >= MAX_CONNECTIONS) {
+        logger.warn(`WebSocket connection rejected: global limit exceeded (${MAX_CONNECTIONS})`);
+        return false;
+      }
+      
+      // Check per-IP connection limit
+      const ipConnections = connectionsByIp.get(clientIp) || 0;
+      if (ipConnections >= MAX_CONNECTIONS_PER_IP) {
+        logger.warn(`WebSocket connection rejected: IP limit exceeded`, { ip: clientIp });
+        return false;
+      }
+      
+      return true;
+    }
+  });
 
-  wss.on('connection', (ws: WebSocket) => {
-    const state: ClientState = { subscriptions: new Set(), alive: true };
+  wss.on('connection', (ws: WebSocket, req) => {
+    const clientIp = req.socket.remoteAddress || 'unknown';
+    const state: ClientState = { 
+      subscriptions: new Set(), 
+      alive: true,
+      ip: clientIp,
+      authenticated: false
+    };
+    
     clients.set(ws, state);
-    logger.info(`WebSocket client connected (total: ${clients.size})`);
+    
+    // Update IP connection count
+    connectionsByIp.set(clientIp, (connectionsByIp.get(clientIp) || 0) + 1);
+    
+    logger.info(`WebSocket client connected from ${clientIp} (total: ${clients.size})`);
 
     ws.on('message', (raw: Buffer) => {
+      if (raw.length > MAX_WS_MESSAGE_SIZE) {
+        sendToClient(ws, { type: 'error', error: `Message too large (max ${MAX_WS_MESSAGE_SIZE} bytes)` });
+        ws.close(1009, 'Message too large');
+        return;
+      }
       try {
         const msg = JSON.parse(raw.toString()) as WSMessage;
         handleClientMessage(ws, state, msg);
@@ -41,7 +91,16 @@ export function initDataFeed(server: Server): WebSocketServer {
 
     ws.on('close', () => {
       clients.delete(ws);
-      logger.info(`WebSocket client disconnected (total: ${clients.size})`);
+      
+      // Update IP connection count
+      const currentCount = connectionsByIp.get(clientIp) || 0;
+      if (currentCount <= 1) {
+        connectionsByIp.delete(clientIp);
+      } else {
+        connectionsByIp.set(clientIp, currentCount - 1);
+      }
+      
+      logger.info(`WebSocket client disconnected from ${clientIp} (total: ${clients.size})`);
     });
 
     ws.on('pong', () => {
@@ -51,7 +110,10 @@ export function initDataFeed(server: Server): WebSocketServer {
     // Send welcome message
     sendToClient(ws, {
       type: 'market_update',
-      data: { message: 'Connected to Cogent data feed', channels: [] },
+      data: { 
+        message: 'Connected to Cogent data feed. Authenticate with {"type":"auth","token":"your_api_key"} to access protected channels.',
+        channels: [] 
+      },
     });
   });
 
@@ -77,18 +139,78 @@ export function initDataFeed(server: Server): WebSocketServer {
   return wss;
 }
 
-function handleClientMessage(ws: WebSocket, state: ClientState, msg: WSMessage): void {
+function handleClientMessage(ws: WebSocket, state: ClientState, msg: any): void {
   switch (msg.type) {
+    case 'auth':
+      // Authenticate client with API key
+      if (typeof msg.token === 'string' && msg.token.length > 0) {
+        const hash = hashApiKey(msg.token);
+        const agent = agentStore.findByApiKeyHash(hash);
+        
+        if (agent && agent.status === 'active') {
+          state.authenticated = true;
+          state.agentId = agent.id;
+          sendToClient(ws, {
+            type: 'market_update',
+            data: { authenticated: true, agentId: agent.id },
+          });
+          logger.debug(`WebSocket client authenticated`, { agentId: agent.id, ip: state.ip });
+        } else {
+          sendToClient(ws, { type: 'error', error: 'Invalid authentication token' });
+        }
+      } else {
+        sendToClient(ws, { type: 'error', error: 'Authentication token required' });
+      }
+      break;
+
     case 'subscribe':
       if (msg.channels) {
+        const allowedChannels: string[] = [];
+        
         for (const ch of msg.channels) {
+          // Validate channel name
+          if (typeof ch !== 'string' || !VALID_CHANNEL_PATTERN.test(ch)) {
+            sendToClient(ws, {
+              type: 'error',
+              error: `Invalid channel name: '${ch}'. Must be 'markets', 'trades', or 'prices:<id>'`
+            });
+            continue;
+          }
+
+          // Check subscription limit
+          if (!state.subscriptions.has(ch) && state.subscriptions.size >= MAX_SUBSCRIPTIONS_PER_CLIENT) {
+            sendToClient(ws, {
+              type: 'error',
+              error: `Subscription limit reached (max ${MAX_SUBSCRIPTIONS_PER_CLIENT})`
+            });
+            break;
+          }
+
+          // Check if channel requires authentication
+          if (ch === 'trades') {
+            if (!state.authenticated) {
+              sendToClient(ws, { 
+                type: 'error', 
+                error: `Channel '${ch}' requires authentication` 
+              });
+              continue;
+            }
+          }
+          
           state.subscriptions.add(ch);
+          allowedChannels.push(ch);
         }
-        sendToClient(ws, {
-          type: 'market_update',
-          data: { subscribed: Array.from(state.subscriptions) },
-        });
-        logger.debug(`Client subscribed to: ${msg.channels.join(', ')}`);
+        
+        if (allowedChannels.length > 0) {
+          sendToClient(ws, {
+            type: 'market_update',
+            data: { subscribed: allowedChannels },
+          });
+          logger.debug(`Client subscribed to: ${allowedChannels.join(', ')}`, { 
+            ip: state.ip,
+            authenticated: state.authenticated 
+          });
+        }
       }
       break;
 
@@ -99,7 +221,7 @@ function handleClientMessage(ws: WebSocket, state: ClientState, msg: WSMessage):
         }
         sendToClient(ws, {
           type: 'market_update',
-          data: { subscribed: Array.from(state.subscriptions) },
+          data: { unsubscribed: msg.channels },
         });
       }
       break;

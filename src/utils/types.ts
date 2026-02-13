@@ -7,7 +7,7 @@ export interface Agent {
   strategy?: string;
   apiKeyHash: string;
   walletAddress: string | null;
-  privateKey: string; // In production, use KMS
+  // privateKey removed - now stored in secure key store
   proxyWallet: string | null;
   status: AgentStatus;
   config: AgentConfig;
@@ -66,6 +66,7 @@ export interface OrderRequest {
   amount: number;
   price: number;
   type?: OrderType;
+  maxSlippage?: number; // Optional slippage protection (default 2%)
 }
 
 export interface Order {
