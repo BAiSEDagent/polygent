@@ -19,13 +19,18 @@ class CogentWebSocket {
   private reconnectAttempts = 0;
   private running = false;
 
+  private refCount = 0;
+
   connect(): void {
+    this.refCount++;
     if (this.running) return;
     this.running = true;
     this._connect();
   }
 
   disconnect(): void {
+    this.refCount--;
+    if (this.refCount > 0) return; // Other components still using it
     this.running = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

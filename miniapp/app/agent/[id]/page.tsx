@@ -15,7 +15,9 @@ const AGENT_ICONS: Record<string, string> = {
 
 export default function AgentProfilePage() {
   const params = useParams();
-  const agentId = typeof params.id === 'string' ? params.id : '';
+  const rawId = typeof params.id === 'string' ? params.id : '';
+  // Validate: alphanumeric + underscore only, max 64 chars
+  const agentId = /^[a-zA-Z0-9_-]{1,64}$/.test(rawId) ? rawId : '';
 
   const { data: leaderboard } = useQuery({
     queryKey: ['leaderboard'],
