@@ -4,17 +4,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0A0B0E',
-        surface: '#111318',
-        border: '#1E2028',
-        primary: '#3B82F6',
-        success: '#10B981',
-        danger: '#EF4444',
-        accent: '#8B5CF6',
-        orange: '#F59E0B',
-        'text-primary': '#FFFFFF',
-        'text-secondary': '#6B7280',
-        'text-muted': '#4B5563',
+        bg: { primary: '#0A0B0E', secondary: '#111318', tertiary: '#1A1D24', hover: '#222630' },
+        border: { DEFAULT: '#1E2028', strong: '#2A2D38' },
+        accent: { blue: '#3B82F6', green: '#10B981', red: '#EF4444', orange: '#F59E0B', purple: '#8B5CF6' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
