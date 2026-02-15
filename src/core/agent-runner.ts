@@ -2,11 +2,13 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
 import { liveDataService, LiveMarket } from './live-data';
 import { paperTrader, PaperTrade } from './paper-trader';
+import { initLiveTrader, getLiveTrader } from './live-trader';
 import { agentStore } from '../models/agent';
 import { tradeStore } from '../models/trade';
 import { checkCircuitBreaker } from './risk';
 import { Strategy } from '../strategies/base';
 import { Agent, Signal, StrategyContext, Portfolio } from '../utils/types';
+import { config } from '../config';
 
 /**
  * Agent Runner — orchestrates strategy agents on a configurable interval.
@@ -259,19 +261,57 @@ class AgentRunner extends EventEmitter {
         // Only execute high-confidence signals
         if (signal.confidence < 0.5) continue;
 
-        // Execute through paper trader
-        const trade = await paperTrader.executeSignal(signal, agent);
-        if (trade) {
-          reg.totalTrades++;
-          this.logActivity(agent, reg.strategy.name, 'trade', {
-            tradeId: trade.id,
-            marketId: trade.marketId,
-            side: trade.side,
-            outcome: trade.outcome,
-            price: trade.executedPrice,
-            amount: trade.amount,
-            reasoning: trade.reasoning,
-          });
+        // Route through paper or live trader based on TRADING_MODE
+        if (config.TRADING_MODE === 'live') {
+          const liveTrader = getLiveTrader();
+          if (liveTrader) {
+            // Map signal to live order — use first token for the outcome
+            const tokenId = signal.tokenId; // strategies must provide this
+            if (tokenId) {
+              const result = await liveTrader.placeOrder({
+                tokenId,
+                side: signal.direction === 'BUY' ? 'BUY' : 'SELL',
+                price: signal.price ?? 0.5,
+                size: Math.min(signal.amount ?? 10, config.MAX_ORDER_SIZE / (signal.price ?? 0.5)),
+                negRisk: signal.negRisk ?? false,
+              });
+              if (result.success) {
+                reg.totalTrades++;
+                this.logActivity(agent, reg.strategy.name, 'trade', {
+                  orderId: result.orderId,
+                  marketId: signal.marketId,
+                  side: signal.direction,
+                  outcome: signal.outcome,
+                  price: signal.price,
+                  amount: result.size,
+                  reasoning: signal.reasoning,
+                  mode: 'LIVE',
+                });
+              } else {
+                this.logActivity(agent, reg.strategy.name, 'error', {
+                  error: result.error,
+                  market: signal.marketId,
+                  mode: 'LIVE',
+                });
+              }
+            }
+          }
+        } else {
+          // Paper trading (default)
+          const trade = await paperTrader.executeSignal(signal, agent);
+          if (trade) {
+            reg.totalTrades++;
+            this.logActivity(agent, reg.strategy.name, 'trade', {
+              tradeId: trade.id,
+              marketId: trade.marketId,
+              side: trade.side,
+              outcome: trade.outcome,
+              price: trade.executedPrice,
+              amount: trade.amount,
+              reasoning: trade.reasoning,
+              mode: 'PAPER',
+            });
+          }
         }
       } catch (error) {
         reg.errors++;

@@ -95,6 +95,8 @@ export class ArbitrageStrategy extends BaseStrategy {
     });
 
     return this.createSignal(market.id, {
+      tokenId: market.tokenIds?.[0],
+      negRisk: market.negRisk,
       direction: 'BUY',
       outcome,
       confidence,
@@ -153,6 +155,8 @@ export class ArbitrageStrategy extends BaseStrategy {
           });
 
           return this.createSignal(market.id, {
+      tokenId: market.tokenIds?.[0],
+      negRisk: market.negRisk,
             direction: 'BUY',
             outcome,
             confidence,

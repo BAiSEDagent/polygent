@@ -82,6 +82,8 @@ class GammaClient {
       description: raw.description ?? '',
       outcomes: this.parseStringArray(raw.outcomes) ?? ['Yes', 'No'],
       outcomePrices: this.parsePrices(raw.outcomePrices ?? raw.outcome_prices),
+      tokenIds: this.parseStringArray(raw.clobTokenIds) ?? [],
+      negRisk: raw.negRisk === true || raw.negRisk === 'true',
       volume: Number(raw.volume ?? raw.volumeNum ?? 0),
       liquidity: Number(raw.liquidity ?? raw.liquidityNum ?? 0),
       endDate: raw.end_date_iso ?? raw.endDate ?? '',

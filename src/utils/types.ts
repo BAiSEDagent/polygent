@@ -107,6 +107,8 @@ export interface Market {
   description: string;
   outcomes: string[];
   outcomePrices: number[];
+  tokenIds: string[];
+  negRisk: boolean;
   volume: number;
   liquidity: number;
   endDate: string;
@@ -155,6 +157,11 @@ export interface Signal {
   suggestedSize: number;
   reasoning: string;
   timestamp: number;
+  // Live trading fields
+  tokenId?: string;
+  price?: number;
+  amount?: number;
+  negRisk?: boolean;
 }
 
 export interface StrategyContext {

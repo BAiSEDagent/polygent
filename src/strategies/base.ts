@@ -76,6 +76,8 @@ export abstract class BaseStrategy implements Strategy {
       suggestedPrice: number;
       suggestedSize: number;
       reasoning: string;
+      tokenId?: string;
+      negRisk?: boolean;
     }
   ): Signal {
     return {
@@ -88,6 +90,11 @@ export abstract class BaseStrategy implements Strategy {
       suggestedSize: params.suggestedSize,
       reasoning: params.reasoning,
       timestamp: Date.now(),
+      // Live trading fields
+      tokenId: params.tokenId,
+      price: params.suggestedPrice,
+      amount: params.suggestedSize,
+      negRisk: params.negRisk,
     };
   }
 

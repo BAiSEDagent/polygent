@@ -95,6 +95,8 @@ export class ContrarianStrategy extends BaseStrategy {
     const direction = priceWentUp ? '📈→📉' : '📉→📈';
 
     return this.createSignal(market.id, {
+      tokenId: market.tokenIds?.[0],
+      negRisk: market.negRisk,
       direction: 'BUY',
       outcome,
       confidence,

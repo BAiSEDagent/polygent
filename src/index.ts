@@ -13,6 +13,7 @@ import { agentRunner } from './core/agent-runner';
 import { paperTrader } from './core/paper-trader';
 import { agentStore } from './models/agent';
 import { tradeStore } from './models/trade';
+import { initLiveTrader } from './core/live-trader';
 
 // Strategies
 import { WhaleTrackerStrategy } from './strategies/whale-tracker';
@@ -138,6 +139,21 @@ async function bootstrap(): Promise<void> {
 
   // 2. Start live data service
   await liveDataService.start();
+
+  // 2.5. Initialize live trader if in live mode
+  if (config.NODE_ENV !== 'production' || process.env.TRADING_MODE === 'live') {
+    if (process.env.TRADING_MODE === 'live' && process.env.PK) {
+      try {
+        initLiveTrader();
+        logger.info('💰 LIVE TRADING MODE — real orders will be placed');
+        logger.warn('⚠️  Max order: $' + (process.env.MAX_ORDER_SIZE || '5') + ', Max exposure: $' + (process.env.MAX_TOTAL_EXPOSURE || '50'));
+      } catch (err) {
+        logger.error('Failed to init live trader, falling back to paper', { error: (err as Error).message });
+      }
+    } else {
+      logger.info('📝 Paper trading mode (set TRADING_MODE=live to trade real money)');
+    }
+  }
 
   // 3. Register strategy agents
   agentRunner.registerAgent('Whale Tracker', new WhaleTrackerStrategy(), {

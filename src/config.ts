@@ -74,6 +74,13 @@ export const config = {
   RATE_LIMIT_WINDOW_MS: envNum('RATE_LIMIT_WINDOW_MS', 60_000),
   RATE_LIMIT_MAX_REQUESTS: envNum('RATE_LIMIT_MAX_REQUESTS', 100),
 
+  // Trading mode: 'paper' or 'live'
+  TRADING_MODE: env('TRADING_MODE', 'paper') as 'paper' | 'live',
+
+  // Live trading limits
+  MAX_ORDER_SIZE: envNum('MAX_ORDER_SIZE', 5),
+  MAX_TOTAL_EXPOSURE: envNum('MAX_TOTAL_EXPOSURE', 50),
+
   // Logging
   LOG_LEVEL: env('LOG_LEVEL', 'info'),
 

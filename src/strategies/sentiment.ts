@@ -118,6 +118,8 @@ export class SentimentStrategy extends BaseStrategy {
     const sourceNames = sentimentResults.map(r => r.source).join(', ');
 
     return this.createSignal(market.id, {
+      tokenId: market.tokenIds?.[0],
+      negRisk: market.negRisk,
       direction: 'BUY',
       outcome,
       confidence,
