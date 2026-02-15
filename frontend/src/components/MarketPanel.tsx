@@ -1,10 +1,10 @@
 interface Market {
   id: string;
   question: string;
+  outcomePrices?: number[];
   yesPrice?: number;
-  noPrice?: number;
-  volume24h?: number;
   volume?: number;
+  volume24h?: number;
   liquidity?: number;
 }
 
@@ -18,24 +18,26 @@ export default function MarketPanel({ markets }: Props) {
       <div className="px-4 py-3 text-xs font-semibold text-gray-400 tracking-wider">📊 TOP MARKETS</div>
       <div className="flex-1 overflow-y-auto">
         {markets.map((m) => {
-          const price = m.yesPrice ?? 0.5;
-          const vol = m.volume24h ?? m.volume ?? 0;
-          const priceCents = (price * 100).toFixed(1);
+          const yesPrice = m.outcomePrices?.[0] ?? m.yesPrice ?? 0.5;
+          const vol = m.volume ?? m.volume24h ?? 0;
+          const priceCents = (yesPrice * 100).toFixed(1);
 
           return (
-            <div key={m.id} className="px-4 py-3 border-b border-border/50 hover:bg-bg-card transition-colors">
-              <div className="text-sm text-white leading-tight mb-2">{m.question}</div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-1">
-                  <span className="text-emerald-400 font-mono font-bold text-sm">YES {priceCents}¢</span>
+            <div key={m.id} className="px-4 py-3 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+              <div className="text-[13px] text-white leading-snug mb-2">{m.question}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-emerald-400 font-mono font-bold text-sm shrink-0">
+                    YES {priceCents}¢
+                  </span>
                   <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-500 rounded-full transition-all"
-                      style={{ width: `${price * 100}%` }}
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(yesPrice * 100, 100)}%` }}
                     />
                   </div>
                 </div>
-                <span className="text-gray-600 text-xs font-mono ml-3">Vol. {formatVol(vol)}</span>
+                <span className="text-gray-600 text-[11px] font-mono shrink-0">Vol. {formatVol(vol)}</span>
               </div>
             </div>
           );

@@ -24,15 +24,24 @@ export default function Arena() {
   const activities = act?.activity ?? [];
   const markets = mkts?.markets ?? mkts?.items ?? [];
 
-  const totalValue = leaderboard.reduce((s: number, a: any) => s + (a.equity || 0), 0);
-  const totalPnl = leaderboard.reduce((s: number, a: any) => s + (a.pnl || 0), 0);
-  const pnlPct = totalValue > 0 ? (totalPnl / (totalValue - totalPnl)) * 100 : 0;
+  // Compute portfolio stats from leaderboard data
+  const totalEquity = leaderboard.reduce((s: number, a: any) => s + (a.currentEquity ?? a.equity ?? 0), 0);
+  const totalDeposited = leaderboard.reduce((s: number, a: any) => s + (a.depositedEquity ?? a.deposited ?? 0), 0);
+  const totalPnl = totalEquity - totalDeposited;
+  const pnlPct = totalDeposited > 0 ? (totalPnl / totalDeposited) * 100 : 0;
   const isUp = totalPnl >= 0;
+
+  // Map leaderboard to distribution format
+  const distAgents = leaderboard.map((a: any) => ({
+    agentId: a.agentId,
+    name: a.agentName || a.name || a.agentId,
+    equity: a.currentEquity ?? a.equity ?? 0,
+  }));
 
   return (
     <div className="h-full flex">
       {/* Left — Leaderboard */}
-      <div className="w-[260px] min-w-[240px] border-r border-border flex flex-col shrink-0">
+      <div className="w-[260px] min-w-[240px] border-r border-white/5 flex flex-col shrink-0">
         <AgentLeaderboard
           agents={leaderboard}
           selectedId={selectedAgent}
@@ -41,15 +50,15 @@ export default function Arena() {
       </div>
 
       {/* Center — Live Activity */}
-      <div className="flex-1 flex flex-col min-w-0 border-r border-border">
+      <div className="flex-1 flex flex-col min-w-0 border-r border-white/5">
         <div className="px-6 py-3 text-xs font-semibold text-gray-400 tracking-wider">📡 LIVE ACTIVITY</div>
 
         {/* Portfolio Value */}
         <div className="px-6 pb-2">
-          <div className="font-mono text-5xl font-bold text-white tracking-tight">
-            ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div className="font-mono text-[48px] font-bold text-white tracking-tight leading-none">
+            ${totalEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-gray-500 text-sm mt-1">Combined Portfolio Value</div>
+          <div className="text-gray-500 text-sm mt-1.5">Combined Portfolio Value</div>
           <div className={`text-sm font-mono mt-0.5 ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
             {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{pnlPct.toFixed(2)}% today
           </div>
@@ -61,18 +70,18 @@ export default function Arena() {
         </div>
 
         {/* Activity Feed */}
-        <div className="flex-1 overflow-hidden border-t border-border">
+        <div className="flex-1 overflow-hidden border-t border-white/5">
           <ActivityFeed activities={activities} highlightAgentId={selectedAgent} />
         </div>
 
         {/* Agent Distribution */}
-        <div className="border-t border-border">
-          <AgentDistribution agents={leaderboard} />
+        <div className="border-t border-white/5">
+          <AgentDistribution agents={distAgents} />
         </div>
       </div>
 
       {/* Right — Top Markets */}
-      <div className="w-[280px] min-w-[260px] shrink-0">
+      <div className="w-[300px] min-w-[280px] shrink-0">
         <MarketPanel markets={markets} />
       </div>
     </div>

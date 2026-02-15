@@ -12,26 +12,35 @@ const navItems = [
 
 export default function Layout() {
   const healthFetcher = useCallback(() => api.getHealth(), []);
+  const lbFetcher = useCallback(() => api.getLeaderboard(), []);
   const { data: health } = useApi(healthFetcher, 5000);
+  const { data: lb } = useApi(lbFetcher, 5000);
 
-  const agents = (health as any)?.agents ?? 0;
-  const markets = (health as any)?.liveData?.marketsTracked ?? 0;
+  const agents = health?.agents ?? 0;
+  const markets = health?.liveData?.marketsLoaded ?? health?.liveData?.marketsTracked ?? 0;
+
+  const leaderboard = lb?.leaderboard ?? [];
+  const totalEquity = leaderboard.reduce((s: number, a: any) => s + (a.currentEquity ?? 0), 0);
+  const totalDeposited = leaderboard.reduce((s: number, a: any) => s + (a.depositedEquity ?? 0), 0);
+  const platformPnl = totalEquity - totalDeposited;
+  const pnlStr = `${platformPnl >= 0 ? '+' : ''}$${Math.abs(platformPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="h-screen flex flex-col bg-bg-primary">
-      <header className="h-12 flex items-center justify-between px-4 border-b border-border shrink-0">
-        <div className="flex items-center gap-6">
-          <span className="font-mono font-bold text-emerald-400 text-lg tracking-widest">COGENT</span>
-          <nav className="flex gap-4">
+    <div className="h-screen flex flex-col" style={{ background: '#0A0B0E' }}>
+      {/* Top Bar */}
+      <header className="h-12 flex items-center justify-between px-5 border-b border-white/5 shrink-0">
+        <div className="flex items-center gap-8">
+          <span className="font-mono font-bold text-emerald-400 text-lg tracking-[0.25em]">COGENT</span>
+          <nav className="flex gap-5">
             {navItems.map(({ to, label }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `text-sm font-medium transition-colors ${
+                  `text-sm font-medium transition-colors pb-0.5 ${
                     isActive
-                      ? 'text-white border-b-2 border-white pb-0.5'
+                      ? 'text-white border-b-2 border-white'
                       : 'text-gray-500 hover:text-gray-300'
                   }`
                 }
@@ -41,17 +50,19 @@ export default function Layout() {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-6 text-xs">
-          <Stat value={agents} label="ACTIVE AGENTS" />
-          <Stat value="$40,000" label="TOTAL CAPITAL" />
-          <Stat value={markets} label="LIVE MARKETS" />
-          <Stat value="+$253.60" label="PLATFORM P&L" color="text-emerald-400" />
+        <div className="flex items-center gap-8 text-xs">
+          <StatBlock value={agents} label="ACTIVE AGENTS" />
+          <StatBlock value={`$${totalDeposited.toLocaleString()}`} label="TOTAL CAPITAL" />
+          <StatBlock value={markets} label="LIVE MARKETS" />
+          <StatBlock value={pnlStr} label="PLATFORM P&L" color={platformPnl >= 0 ? 'text-emerald-400' : 'text-red-400'} />
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-emerald-400 font-semibold">LIVE</span>
+            <span className="text-emerald-400 font-semibold tracking-wide">LIVE</span>
           </div>
         </div>
       </header>
+
+      {/* Content */}
       <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>
@@ -59,11 +70,11 @@ export default function Layout() {
   );
 }
 
-function Stat({ value, label, color }: { value: string | number; label: string; color?: string }) {
+function StatBlock({ value, label, color }: { value: string | number; label: string; color?: string }) {
   return (
     <div className="text-center">
-      <div className={`font-mono font-semibold ${color || 'text-white'}`}>{value}</div>
-      <div className="text-gray-600 text-[10px]">{label}</div>
+      <div className={`font-mono font-bold text-sm ${color || 'text-white'}`}>{value}</div>
+      <div className="text-gray-600 text-[10px] tracking-wider">{label}</div>
     </div>
   );
 }
