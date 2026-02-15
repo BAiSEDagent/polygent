@@ -13,5 +13,6 @@ export const api = {
   getRunnerTrades: (id: string, limit = 50) => get<{ trades: any[]; total: number }>(`/runners/${id}/trades?limit=${limit}`),
   getStats: () => get<any>('/stats'),
   getMarkets: (limit = 50) => get<any>(`/markets?limit=${limit}&order=volume`),
+  getPortfolio: () => get<any>('/portfolio'),
   getHealth: () => fetch('/health').then(r => r.json()),
 };

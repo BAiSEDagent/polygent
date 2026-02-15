@@ -2,23 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-html, body, #root {
-  height: 100%;
-  background: #0A0B0E;
-  color: #FFFFFF;
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #0A0B0E; }
-::-webkit-scrollbar-thumb { background: #1E2028; }
-::-webkit-scrollbar-thumb:hover { background: #2a2b35; }
-
-@keyframes pulse-live {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-.pulse-live { animation: pulse-live 2s ease-in-out infinite; }
-.tabular-nums { font-variant-numeric: tabular-nums; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+body { background: #0A0B0E; color: #fff; font-family: 'Inter', system-ui, sans-serif; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1E2028; border-radius: 2px; }

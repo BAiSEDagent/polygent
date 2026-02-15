@@ -1,48 +1,20 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
-export interface WSEvent {
-  type: string;
-  data?: any;
-}
-
-export function useWebSocket(channels: string[] = ['trades', 'markets']) {
-  const [connected, setConnected] = useState(false);
-  const [events, setEvents] = useState<WSEvent[]>([]);
+export function useWebSocket(path: string) {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout>>();
+  const [lastMessage, setLastMessage] = useState<any>(null);
+  const [connected, setConnected] = useState(false);
 
   const connect = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/feed`);
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}${path}`);
+    ws.onopen = () => setConnected(true);
+    ws.onclose = () => { setConnected(false); setTimeout(connect, 3000); };
+    ws.onmessage = (e) => { try { setLastMessage(JSON.parse(e.data)); } catch {} };
     wsRef.current = ws;
+  }, [path]);
 
-    ws.onopen = () => {
-      setConnected(true);
-      ws.send(JSON.stringify({ type: 'subscribe', channels }));
-    };
+  useEffect(() => { connect(); return () => wsRef.current?.close(); }, [connect]);
 
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        setEvents(prev => [msg, ...prev].slice(0, 200));
-      } catch {}
-    };
-
-    ws.onclose = () => {
-      setConnected(false);
-      reconnectRef.current = setTimeout(connect, 3000);
-    };
-
-    ws.onerror = () => ws.close();
-  }, [channels]);
-
-  useEffect(() => {
-    connect();
-    return () => {
-      wsRef.current?.close();
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
-    };
-  }, [connect]);
-
-  return { connected, events };
+  return { lastMessage, connected };
 }

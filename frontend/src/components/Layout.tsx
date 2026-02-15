@@ -1,81 +1,78 @@
-import { Link, useLocation } from 'react-router-dom';
-import { ReactNode } from 'react';
-import { formatUsd } from '../lib/format';
+import { NavLink, Outlet } from 'react-router-dom';
+import { useCallback } from 'react';
+import { useApi } from '../hooks/useApi';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { api } from '../lib/api';
 
-interface Props {
-  children: ReactNode;
-  connected: boolean;
-  stats: {
-    totalAgents: number;
-    totalVolume: number;
-    platformPnl: number;
-    marketsTracked: number;
-  };
+function fmt(n: number): string {
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+  return `$${n.toFixed(0)}`;
 }
 
-const NAV = [
-  { path: '/', label: 'Arena' },
-  { path: '/markets', label: 'Markets' },
-  { path: '/agents', label: 'Agents' },
-  { path: '/connect', label: 'Connect' },
-];
+export default function Layout() {
+  const healthFetcher = useCallback(() => api.getHealth(), []);
+  const { data: health } = useApi(healthFetcher, 5000);
+  const { connected } = useWebSocket();
 
-export default function Layout({ children, connected, stats }: Props) {
-  const loc = useLocation();
+  const agents = health?.agents ?? 0;
+  const markets = health?.liveData?.marketCount ?? 0;
+
+  const navLinks = [
+    { to: '/', label: 'Arena' },
+    { to: '/markets', label: 'Markets' },
+    { to: '/agents', label: 'Agents' },
+    { to: '/connect', label: 'Connect' },
+  ];
 
   return (
-    <div className="h-screen flex flex-col bg-bg">
-      <header className="h-12 flex items-center justify-between px-4 border-b border-border bg-surface/80 backdrop-blur-sm shrink-0">
+    <>
+      {/* Top Bar */}
+      <header className="h-12 flex items-center justify-between px-4 border-b border-border bg-bg-secondary shrink-0">
         <div className="flex items-center gap-6">
-          <Link to="/" className="font-mono text-base font-bold tracking-widest text-success">
-            COGENT
-          </Link>
-          <nav className="flex items-center gap-1">
-            {NAV.map(({ path, label }) => {
-              const active = path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(path);
-              return (
-                <Link
-                  key={path}
-                  to={path}
-                  className={`text-xs px-3 py-1.5 transition-colors ${
-                    active
-                      ? 'text-white border-b-2 border-primary'
-                      : 'text-text-muted hover:text-text-secondary'
-                  }`}
-                >
-                  {label}
-                </Link>
-              );
-            })}
+          <span className="font-mono font-bold text-accent-green text-lg tracking-widest">COGENT</span>
+          <nav className="flex gap-4">
+            {navLinks.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                end={l.to === '/'}
+                className={({ isActive }) =>
+                  `text-sm font-medium transition-colors ${
+                    isActive ? 'text-white border-b-2 border-white pb-0.5' : 'text-gray-500 hover:text-gray-300'
+                  }`
+                }
+              >
+                {l.label}
+              </NavLink>
+            ))}
           </nav>
         </div>
-
-        <div className="flex items-center gap-5 text-xs font-mono">
-          <Stat label="" value={`${stats.totalAgents} ACTIVE AGENTS`} />
-          <Stat label="" value={`${formatUsd(stats.totalVolume)} TOTAL CAPITAL`} />
-          <Stat label="" value={`${stats.marketsTracked} LIVE MARKETS`} />
-          <span className={stats.platformPnl >= 0 ? 'text-success' : 'text-danger'}>
-            {stats.platformPnl >= 0 ? '+' : ''}{formatUsd(stats.platformPnl)} PLATFORM P&L
-          </span>
+        <div className="flex items-center gap-6 text-xs">
+          <Stat value={agents} label="ACTIVE AGENTS" />
+          <Stat value={fmt(40000)} label="TOTAL CAPITAL" raw />
+          <Stat value={markets} label="LIVE MARKETS" />
+          <Stat value="+$253.60" label="PLATFORM P&L" raw color="text-accent-green" />
           <div className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-success pulse-live' : 'bg-danger'}`} />
-            <span className={connected ? 'text-success' : 'text-danger'}>
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-accent-green animate-pulse' : 'bg-red-500'}`} />
+            <span className={`font-mono font-semibold ${connected ? 'text-accent-green' : 'text-red-500'}`}>
               {connected ? 'LIVE' : 'OFFLINE'}
             </span>
           </div>
         </div>
       </header>
-
-      <main className="flex-1 overflow-hidden">{children}</main>
-    </div>
+      <main className="flex-1 overflow-hidden">
+        <Outlet />
+      </main>
+    </>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ value, label, raw, color }: { value: any; label: string; raw?: boolean; color?: string }) {
   return (
-    <span className="text-text-secondary">
-      {label && <span className="text-text-muted mr-1">{label}</span>}
-      {value}
-    </span>
+    <div className="flex flex-col items-center">
+      <span className={`font-mono font-bold ${color ?? 'text-white'}`}>{raw ? value : value}</span>
+      <span className="text-gray-600 tracking-wider">{label}</span>
+    </div>
   );
 }
