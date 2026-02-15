@@ -1,46 +1,44 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { useMemo } from 'react';
 
 interface Props {
-  totalValue: number;
+  data: { time: string; value: number }[];
 }
 
-export default function PnLChart({ totalValue }: Props) {
-  const data = useMemo(() => {
-    const points = [];
-    const base = totalValue || 40000;
-    const now = Date.now();
-    for (let i = 48; i >= 0; i--) {
-      const noise = (Math.random() - 0.45) * base * 0.008;
-      const trend = ((48 - i) / 48) * base * 0.006;
-      points.push({
-        time: new Date(now - i * 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        value: base + trend + noise,
-      });
-    }
-    // Ensure last point matches actual value
-    points[points.length - 1].value = base;
-    return points;
-  }, [totalValue]);
+export default function PnLChart({ data }: Props) {
+  if (!data.length) {
+    // Generate mock curve if no data
+    const mock = Array.from({ length: 48 }, (_, i) => ({
+      time: `${Math.floor(i / 2)}:${i % 2 === 0 ? '00' : '30'}`,
+      value: 39800 + Math.random() * 200 + i * 10 + Math.sin(i / 3) * 100,
+    }));
+    data = mock;
+  }
 
   return (
-    <div className="h-48 w-full">
+    <div className="w-full h-full min-h-[200px]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
           <defs>
-            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
               <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#4B5563' }} axisLine={false} tickLine={false} interval={11} />
-          <YAxis hide domain={['auto', 'auto']} />
+          <XAxis dataKey="time" hide />
+          <YAxis hide domain={['dataMin - 100', 'dataMax + 100']} />
           <Tooltip
-            contentStyle={{ background: '#111318', border: '1px solid #1E2028', borderRadius: 4, fontSize: 12 }}
+            contentStyle={{ background: '#111318', border: '1px solid #1E2028', borderRadius: 8, fontSize: 12 }}
             labelStyle={{ color: '#6B7280' }}
-            formatter={(v: number) => [`$${v.toFixed(2)}`, 'Value']}
+            formatter={(val: number) => [`$${val.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'Value']}
           />
-          <Area type="monotone" dataKey="value" stroke="#3B82F6" strokeWidth={2} fill="url(#chartGrad)" />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="#3B82F6"
+            strokeWidth={2}
+            fill="url(#pnlGrad)"
+            animationDuration={800}
+          />
         </AreaChart>
       </ResponsiveContainer>
     </div>

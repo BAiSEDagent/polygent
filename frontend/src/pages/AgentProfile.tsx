@@ -83,7 +83,7 @@ export default function AgentProfile() {
       {/* P&L Chart */}
       <div className="mb-4">
         <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted mb-1">Equity Curve</div>
-        <PnLChart data={equityData} height={180} />
+        <PnLChart data={equityData}  />
       </div>
 
       {/* Trade History */}

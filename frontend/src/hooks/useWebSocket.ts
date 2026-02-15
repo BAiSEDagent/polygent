@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-export function useWebSocket(path: string) {
+export function useWebSocket(path = '/ws/feed') {
   const wsRef = useRef<WebSocket | null>(null);
   const [lastMessage, setLastMessage] = useState<any>(null);
   const [connected, setConnected] = useState(false);

@@ -1,14 +1,8 @@
-interface Props {
-  label: string;
-  value: string;
-  className?: string;
-}
-
-export default function StatCard({ label, value, className = '' }: Props) {
+export default function StatCard({ value, label }: { value: string | number; label: string }) {
   return (
-    <div className={`text-center ${className}`}>
-      <div className="text-text-muted text-[10px] font-mono uppercase">{label}</div>
-      <div className="text-white text-sm font-mono tabular-nums">{value}</div>
+    <div className="text-center">
+      <div className="font-mono font-bold text-white text-sm">{value}</div>
+      <div className="text-[10px] text-gray-600 tracking-wider">{label}</div>
     </div>
   );
 }

@@ -1,33 +1,16 @@
-import { timeAgo } from '../lib/format';
+const AGENT_COLORS: Record<string, string> = {
+  'Arbitrage Scanner': 'text-blue-400',
+  'Whale Tracker': 'text-emerald-400',
+  'Contrarian': 'text-orange-400',
+  'Sentiment': 'text-purple-400',
+};
 
 interface Activity {
-  agentId: string;
   agentName: string;
   strategyName: string;
   type: string;
-  data?: {
-    marketId?: string;
-    direction?: string;
-    outcome?: string;
-    confidence?: number;
-    reasoning?: string;
-    side?: string;
-    price?: number;
-    amount?: number;
-    error?: string;
-  };
+  data?: any;
   timestamp: number;
-}
-
-const AGENT_COLORS: Record<string, string> = {};
-const PALETTE = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-let colorIdx = 0;
-function getAgentColor(name: string): string {
-  if (!AGENT_COLORS[name]) {
-    AGENT_COLORS[name] = PALETTE[colorIdx % PALETTE.length];
-    colorIdx++;
-  }
-  return AGENT_COLORS[name];
 }
 
 interface Props {
@@ -37,38 +20,54 @@ interface Props {
 
 export default function ActivityFeed({ activities }: Props) {
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      {activities.slice(0, 30).map((a, i) => {
-        const color = getAgentColor(a.agentName);
-        const actionText = a.type === 'trade'
-          ? `${a.data?.side ?? 'BUY'} ${a.data?.outcome ?? ''}`
-          : a.type === 'signal'
-          ? `Signal: ${a.data?.direction ?? ''} ${a.data?.outcome ?? ''}`
-          : a.type === 'error'
-          ? 'Error'
-          : a.type;
+    <div className="h-full overflow-y-auto px-4 py-2 space-y-2">
+      {activities.slice(-50).reverse().map((act, i) => {
+        const time = new Date(act.timestamp);
+        const timeStr = time.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const color = AGENT_COLORS[act.agentName] || 'text-gray-400';
+        const { label, detail, conf } = formatActivity(act);
 
         return (
-          <div key={`${a.timestamp}-${i}`} className="flex items-start gap-3 px-4 py-2 border-b border-border/50 text-xs">
-            <span className="text-text-muted font-mono shrink-0 w-12 tabular-nums">
-              {timeAgo(a.timestamp)}
-            </span>
-            <span className="font-semibold shrink-0" style={{ color }}>{a.agentName}</span>
-            <span className="text-text-secondary">{actionText}</span>
-            {a.data?.reasoning && (
-              <span className="text-text-muted truncate flex-1">{a.data.reasoning}</span>
-            )}
-            {a.data?.confidence != null && (
-              <span className="shrink-0 bg-success/20 text-success text-[10px] font-mono px-1.5 py-0.5 rounded-full">
-                {(a.data.confidence * 100).toFixed(0)}%
+          <div key={`${act.timestamp}-${i}`} className="text-sm">
+            <span className="text-gray-600 font-mono text-xs mr-2">{timeStr}</span>
+            <span className={`font-semibold ${color} mr-1`}>{act.agentName}</span>
+            <span className="text-gray-300">{label}</span>
+            {detail && <div className="ml-16 text-gray-500 text-xs mt-0.5">{detail}</div>}
+            {conf !== null && (
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono">
+                {conf}%
               </span>
             )}
           </div>
         );
       })}
       {activities.length === 0 && (
-        <div className="p-4 text-text-muted text-xs text-center">No activity yet</div>
+        <div className="text-gray-600 text-sm text-center py-8">Waiting for agent activity...</div>
       )}
     </div>
   );
+}
+
+function formatActivity(act: Activity): { label: string; detail: string | null; conf: number | null } {
+  const d = act.data || {};
+  switch (act.type) {
+    case 'signal':
+      return {
+        label: `Detected ${d.confidence ? (d.confidence * 100).toFixed(1) + '% ' : ''}signal`,
+        detail: d.reasoning || d.marketId?.slice(0, 40),
+        conf: d.confidence ? Math.round(d.confidence * 100) : null,
+      };
+    case 'trade':
+      return {
+        label: `${d.side} ${d.outcome} @ $${d.price?.toFixed(3) || '?'}`,
+        detail: d.reasoning || d.marketId?.slice(0, 40),
+        conf: null,
+      };
+    case 'circuit_break':
+      return { label: '⚠️ Circuit breaker triggered', detail: `Drawdown: ${d.drawdown}`, conf: null };
+    case 'error':
+      return { label: 'Error', detail: d.error?.slice(0, 80), conf: null };
+    default:
+      return { label: act.type, detail: null, conf: null };
+  }
 }

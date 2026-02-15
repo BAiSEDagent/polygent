@@ -1,84 +1,61 @@
-const AGENT_COLORS: Record<string, string> = {
-  'Whale Tracker': '#3B82F6',
-  'Arbitrage Scanner': '#10B981',
-  'Contrarian': '#F59E0B',
-  'Sentiment': '#8B5CF6',
-};
-
-const BADGES: Record<string, { label: string; color: string }> = {
-  'Whale Tracker': { label: 'WHALE', color: 'bg-blue-500/20 text-blue-400' },
-  'Arbitrage Scanner': { label: 'ARB', color: 'bg-emerald-500/20 text-emerald-400' },
-  'Contrarian': { label: 'CTR', color: 'bg-amber-500/20 text-amber-400' },
-  'Sentiment': { label: 'SENT', color: 'bg-purple-500/20 text-purple-400' },
+const AGENT_COLORS: Record<string, { border: string; badge: string; badgeText: string; label: string }> = {
+  agent_arbitrage_scanner: { border: 'border-l-blue-500', badge: 'bg-blue-500/20 text-blue-400', badgeText: 'ARB', label: 'Cross-market mispricing · 120s' },
+  agent_whale_tracker: { border: 'border-l-emerald-500', badge: 'bg-emerald-500/20 text-emerald-400', badgeText: 'WHALE', label: 'Smart money following · 300s' },
+  agent_contrarian: { border: 'border-l-orange-500', badge: 'bg-orange-500/20 text-orange-400', badgeText: 'CTR', label: 'Mean reversion · 600s' },
+  agent_sentiment: { border: 'border-l-purple-500', badge: 'bg-purple-500/20 text-purple-400', badgeText: 'SENT', label: 'News + social signals · 900s' },
 };
 
 interface Agent {
   agentId: string;
   name: string;
-  strategy: string;
   pnl: number;
   equity: number;
-  totalTrades: number;
-  lastRun: number;
+  strategy: string;
 }
 
-export default function AgentLeaderboard({
-  agents,
-  selectedId,
-  onSelect,
-}: {
+interface Props {
   agents: Agent[];
   selectedId?: string;
   onSelect?: (id: string) => void;
-}) {
+}
+
+export default function AgentLeaderboard({ agents, selectedId, onSelect }: Props) {
   const sorted = [...agents].sort((a, b) => b.pnl - a.pnl);
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-4 py-3 border-b border-border">
-        <h2 className="text-xs font-semibold text-gray-400 tracking-wider">⚡ LEADERBOARD</h2>
-      </div>
+      <div className="px-4 py-3 text-xs font-semibold text-gray-400 tracking-wider">⚡ LEADERBOARD</div>
       <div className="flex-1 overflow-y-auto">
         {sorted.map((agent, i) => {
-          const color = AGENT_COLORS[agent.name] ?? '#6B7280';
-          const badge = BADGES[agent.name];
-          const isSelected = agent.agentId === selectedId;
+          const c = AGENT_COLORS[agent.agentId] || AGENT_COLORS.agent_arbitrage_scanner;
+          const isProfit = agent.pnl >= 0;
           return (
             <div
               key={agent.agentId}
               onClick={() => onSelect?.(agent.agentId)}
-              className={`px-4 py-3 border-b border-border cursor-pointer transition-colors hover:bg-bg-hover ${
-                isSelected ? 'bg-bg-hover' : ''
+              className={`px-4 py-3 border-l-2 ${c.border} cursor-pointer transition-colors ${
+                selectedId === agent.agentId ? 'bg-bg-hover' : 'hover:bg-bg-card'
               }`}
-              style={{ borderLeft: `3px solid ${color}` }}
             >
-              <div className="flex items-start justify-between">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600 font-mono text-sm">{i + 1}</span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-white">{agent.name}</span>
-                      {badge && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${badge.color}`}>
-                          {badge.label}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs text-gray-600">
-                      {agent.strategy} · {agent.totalTrades} trades
-                    </span>
-                  </div>
+                  <span className="text-gray-600 font-mono text-xs w-4">{i + 1}</span>
+                  <span className="font-semibold text-sm text-white truncate">{agent.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${c.badge}`}>{c.badgeText}</span>
                 </div>
-                <span
-                  className={`font-mono font-bold text-sm ${agent.pnl >= 0 ? 'text-accent-green' : 'text-accent-red'}`}
-                >
-                  {agent.pnl >= 0 ? '+' : ''}${agent.pnl.toFixed(2)}
+                <span className={`font-mono text-sm font-semibold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {isProfit ? '+' : ''}{formatUsd(agent.pnl)}
                 </span>
               </div>
+              <div className="text-[11px] text-gray-600 mt-0.5 ml-6">{c.label}</div>
             </div>
           );
         })}
       </div>
     </div>
   );
+}
+
+function formatUsd(n: number): string {
+  return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

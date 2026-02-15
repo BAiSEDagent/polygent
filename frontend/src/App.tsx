@@ -1,35 +1,21 @@
-import { Routes, Route } from 'react-router-dom';
-import { useCallback, useMemo } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Arena from './pages/Arena';
-import AgentProfile from './pages/AgentProfile';
 import Markets from './pages/Markets';
+import AgentProfile from './pages/AgentProfile';
 import Connect from './pages/Connect';
-import { useWebSocket } from './hooks/useWebSocket';
-import { useApi } from './hooks/useApi';
-import { api } from './lib/api';
 
 export default function App() {
-  const { connected } = useWebSocket(['trades', 'markets']);
-
-  const statsFetcher = useCallback(() => api.getStats(), []);
-  const { data: stats } = useApi(statsFetcher, 5000);
-
-  const layoutStats = useMemo(() => ({
-    totalAgents: stats?.agents?.total ?? 0,
-    totalVolume: stats?.trading?.totalVolume ?? 0,
-    platformPnl: 0, // calculated from leaderboard
-    marketsTracked: stats?.liveData?.marketsTracked ?? 0,
-  }), [stats]);
-
   return (
-    <Layout connected={connected} stats={layoutStats}>
+    <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Arena />} />
-        <Route path="/agent/:id" element={<AgentProfile />} />
-        <Route path="/markets" element={<Markets />} />
-        <Route path="/connect" element={<Connect />} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<Arena />} />
+          <Route path="/markets" element={<Markets />} />
+          <Route path="/agents" element={<AgentProfile />} />
+          <Route path="/connect" element={<Connect />} />
+        </Route>
       </Routes>
-    </Layout>
+    </BrowserRouter>
   );
 }

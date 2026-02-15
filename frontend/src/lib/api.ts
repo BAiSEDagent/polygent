@@ -7,10 +7,10 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  getLeaderboard: () => get<{ leaderboard: any[]; total: number }>('/leaderboard'),
-  getActivity: (limit = 50) => get<{ activity: any[]; total: number }>(`/activity?limit=${limit}`),
-  getRunners: () => get<{ agents: any[]; total: number }>('/runners'),
-  getRunnerTrades: (id: string, limit = 50) => get<{ trades: any[]; total: number }>(`/runners/${id}/trades?limit=${limit}`),
+  getLeaderboard: () => get<any>('/leaderboard'),
+  getActivity: (limit = 50) => get<any>(`/activity?limit=${limit}`),
+  getRunners: () => get<any>('/runners'),
+  getRunnerTrades: (id: string, limit = 50) => get<any>(`/runners/${id}/trades?limit=${limit}`),
   getStats: () => get<any>('/stats'),
   getMarkets: (limit = 50) => get<any>(`/markets?limit=${limit}&order=volume`),
   getPortfolio: () => get<any>('/portfolio'),
