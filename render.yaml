@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: cogent
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: frankfurt
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRADING_MODE
+        value: live
+      - key: BIND_ALL
+        value: "true"
+      - key: PORT
+        value: "3000"
+      - key: PK
+        sync: false
+      - key: CLOB_API_KEY
+        sync: false
+      - key: CLOB_SECRET
+        sync: false
+      - key: CLOB_PASSPHRASE
+        sync: false
+      - key: FUNDER_ADDRESS
+        sync: false
+      - key: CHAIN_ID
+        value: "137"
+      - key: BUILDER_ADDRESS
+        value: "0x5cdda04d8f75befaacb49811788c109eb0cec2c5"
+      - key: MAX_ORDER_SIZE
+        value: "5"
+      - key: MAX_TOTAL_EXPOSURE
+        value: "50"
