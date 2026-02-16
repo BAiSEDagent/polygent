@@ -5,7 +5,7 @@ import { agentStore } from '../models/agent';
 import { getAgentPrivateKey } from './key-store';
 
 /**
- * Wallet provisioning for Cogent agents.
+ * Wallet provisioning for Polygent agents.
  *
  * Each agent gets an EOA keypair. On first trade, we deploy a proxy wallet
  * (1-of-1 Gnosis Safe) via Polymarket's relayer. The proxy wallet is the

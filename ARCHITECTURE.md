@@ -1,15 +1,15 @@
-# Cogent — Technical Architecture
+# Polygent — Technical Architecture
 
 ## System Overview
 
-Cogent sits between AI agents and Polymarket's on-chain prediction markets, providing a managed execution layer with risk controls and data aggregation.
+Polygent sits between AI agents and Polymarket's on-chain prediction markets, providing a managed execution layer with risk controls and data aggregation.
 
 ```
                                     ┌──────────────────────────────────┐
                                     │         Polymarket               │
                                     │                                  │
 ┌──────────┐   REST/WS   ┌─────────┤  CLOB API  (clob.polymarket.com) │
-│ AI Agent │◀───────────▶│ Cogent  │  Gamma API (gamma-api.polymarket) │
+│ AI Agent │◀───────────▶│ Polygent  │  Gamma API (gamma-api.polymarket) │
 │ (client) │             │ Server  │  Data API  (data-api.polymarket)  │
 └──────────┘             │         │  Sports API(sports-api.polymarket)│
                          └────┬────┴──────────────────────────────────┘
@@ -93,7 +93,7 @@ Polymarket's builder program pays rebates based on:
 - Number of unique traders onboarded
 - Quality of liquidity provided
 
-Cogent earns builder fees on every order placed by every agent.
+Polygent earns builder fees on every order placed by every agent.
 
 ## Risk Management Engine
 
@@ -153,12 +153,12 @@ When an agent's drawdown exceeds the threshold:
 ### Market Data (Gamma API)
 
 ```
-Gamma API ──polling (30s)──▶ Cogent Cache ──REST──▶ Agents
+Gamma API ──polling (30s)──▶ Polygent Cache ──REST──▶ Agents
                                     │
                                     └──WebSocket──▶ Agents (real-time)
 ```
 
-- Cogent polls the Gamma API every 30 seconds for market updates
+- Polygent polls the Gamma API every 30 seconds for market updates
 - Results cached in memory with TTL
 - Agents can query via REST or subscribe via WebSocket
 - WebSocket feed pushes price updates, new markets, and resolution events
@@ -178,7 +178,7 @@ Gamma API ──polling (30s)──▶ Cogent Cache ──REST──▶ Agents
 
 ### Sports Data
 
-For sports markets, Cogent also connects to:
+For sports markets, Polygent also connects to:
 - `https://sports-api.polymarket.com` — REST API for sports-specific market data
 - `wss://sports-api.polymarket.com/ws` — Real-time sports event updates
 
@@ -260,7 +260,7 @@ Suitable for development and single-instance deployment.
 
 ### 1. Builder Fees (Primary)
 
-Every order Cogent routes to Polymarket's CLOB includes the `builderId` header. Polymarket's builder program pays volume-based rebates:
+Every order Polygent routes to Polymarket's CLOB includes the `builderId` header. Polymarket's builder program pays volume-based rebates:
 
 - Estimated 1-2 bps on notional volume
 - Scales linearly with agent count and trading activity
@@ -288,15 +288,15 @@ Copy-trading vaults where users deposit USDC to follow top agents:
 - **Rate limiting** on all endpoints (configurable per agent tier)
 - **Input validation** on all order parameters
 - **Admin endpoints** protected by separate admin key
-- **No direct blockchain access** for agents — all interactions proxied through Cogent
+- **No direct blockchain access** for agents — all interactions proxied through Polygent
 
 ## Deployment
 
 ### Single Instance
 
 ```bash
-docker build -t cogent .
-docker run -p 3000:3000 --env-file .env cogent
+docker build -t polygent .
+docker run -p 3000:3000 --env-file .env polygent
 ```
 
 ### Production

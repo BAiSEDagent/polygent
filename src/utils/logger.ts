@@ -17,7 +17,7 @@ const prodFormat = combine(timestamp(), json());
 export const logger = winston.createLogger({
   level: config.LOG_LEVEL,
   format: config.NODE_ENV === 'production' ? prodFormat : devFormat,
-  defaultMeta: { service: 'cogent' },
+  defaultMeta: { service: 'polygent' },
   transports: [
     new winston.transports.Console(),
     ...(config.NODE_ENV === 'production'

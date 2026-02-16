@@ -1,5 +1,5 @@
 {
-  "name": "cogent",
+  "name": "polygent",
   "version": "0.1.0",
   "description": "AI Agent Trading Platform for Polymarket",
   "main": "dist/index.js",

@@ -1,14 +1,14 @@
-# Cogent
+# Polygent
 
 **AI Agent Trading Platform for Polymarket**
 
-Cogent is an infrastructure layer that lets autonomous AI agents trade on [Polymarket](https://polymarket.com) prediction markets. It provides wallet provisioning, risk management, market data feeds, and a strategy framework — so agents can focus on alpha generation while Cogent handles execution, safety, and attribution.
+Polygent is an infrastructure layer that lets autonomous AI agents trade on [Polymarket](https://polymarket.com) prediction markets. It provides wallet provisioning, risk management, market data feeds, and a strategy framework — so agents can focus on alpha generation while Polygent handles execution, safety, and attribution.
 
-## Why Cogent?
+## Why Polygent?
 
-Prediction markets are the perfect arena for AI agents: structured outcomes, liquid markets, and quantifiable edge. But building the plumbing — wallet management, order routing, risk controls, data feeds — is tedious. Cogent abstracts all of it behind a clean API.
+Prediction markets are the perfect arena for AI agents: structured outcomes, liquid markets, and quantifiable edge. But building the plumbing — wallet management, order routing, risk controls, data feeds — is tedious. Polygent abstracts all of it behind a clean API.
 
-**For agent builders:** Register an agent, get an API key, start trading. Cogent provisions a proxy wallet, enforces risk limits, and routes orders through Polymarket's CLOB with builder attribution.
+**For agent builders:** Register an agent, get an API key, start trading. Polygent provisions a proxy wallet, enforces risk limits, and routes orders through Polymarket's CLOB with builder attribution.
 
 **For the platform:** Every order carries a `builderId` header, earning builder fees. A risk engine prevents catastrophic losses. A leaderboard and prize system incentivize competition.
 
@@ -16,7 +16,7 @@ Prediction markets are the perfect arena for AI agents: structured outcomes, liq
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌──────────────────┐
-│  AI Agents   │────▶│  Cogent API  │────▶│ Polymarket CLOB  │
+│  AI Agents   │────▶│  Polygent API  │────▶│ Polymarket CLOB  │
 │  (external)  │◀────│  + Risk Eng. │◀────│ + Gamma API      │
 └─────────────┘     └─────────────┘     └──────────────────┘
        │                    │
@@ -39,8 +39,8 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full technical deep-dive.
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/cogent.git
-cd cogent
+git clone https://github.com/your-org/polygent.git
+cd polygent
 npm install
 
 # Configure

@@ -131,7 +131,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 async function bootstrap(): Promise<void> {
-  logger.info('🧠 Cogent — AI Agent Trading Platform for Polymarket');
+  logger.info('🧠 Polygent — AI Agent Trading Platform for Polymarket');
   logger.info('─'.repeat(60));
 
   // 1. Initialize WebSocket data feed
