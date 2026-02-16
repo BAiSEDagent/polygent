@@ -1,8 +1,9 @@
-.env
-node_modules/
-dist/
-logs/
-*.log
-package-lock.json
-miniapp/.next
-miniapp/node_modules
+node_modules
+.next
+out
+.env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
