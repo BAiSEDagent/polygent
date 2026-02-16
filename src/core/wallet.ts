@@ -69,10 +69,16 @@ export async function deployProxyWallet(agentId: string): Promise<string> {
     });
 
     if (!response.ok) {
-      if (config.NODE_ENV === 'production') {
-        throw new Error(`Proxy wallet deployment failed for agent ${agentId}. Cannot trade without proxy wallet in production.`);
+      // Use configured FUNDER_ADDRESS as proxy wallet (the Gnosis Safe / operator proxy)
+      if (config.FUNDER_ADDRESS) {
+        logger.info(`Using configured FUNDER_ADDRESS as proxy wallet for ${agentId}`);
+        agentStore.update(agentId, { proxyWallet: config.FUNDER_ADDRESS });
+        return config.FUNDER_ADDRESS;
       }
-      logger.warn(`Relayer unavailable, using EOA address as proxy wallet for ${agentId}`);
+      if (config.NODE_ENV === 'production') {
+        throw new Error(`Proxy wallet deployment failed for agent ${agentId}. No FUNDER_ADDRESS configured.`);
+      }
+      logger.warn(`Relayer unavailable and no FUNDER_ADDRESS, using EOA address as proxy wallet for ${agentId}`);
       const proxyAddress = agent.walletAddress!;
       agentStore.update(agentId, { proxyWallet: proxyAddress });
       return proxyAddress;
@@ -86,8 +92,14 @@ export async function deployProxyWallet(agentId: string): Promise<string> {
 
     return proxyAddress;
   } catch (error) {
+    // Use configured FUNDER_ADDRESS as proxy wallet
+    if (config.FUNDER_ADDRESS) {
+      logger.info(`Relayer failed, using configured FUNDER_ADDRESS as proxy wallet for ${agentId}`);
+      agentStore.update(agentId, { proxyWallet: config.FUNDER_ADDRESS });
+      return config.FUNDER_ADDRESS;
+    }
     if (config.NODE_ENV === 'production') {
-      throw new Error(`Proxy wallet deployment failed for agent ${agentId}. Cannot trade without proxy wallet in production.`);
+      throw new Error(`Proxy wallet deployment failed for agent ${agentId}. No FUNDER_ADDRESS configured.`);
     }
     logger.warn(`Proxy wallet deployment failed, using EOA as fallback`, {
       agentId,

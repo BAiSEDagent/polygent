@@ -122,10 +122,12 @@ class CLOBClient {
     const expiration = (Math.floor(Date.now() / 1000) + 86400).toString(); // 24h
 
     // EIP-712 domain for Polymarket CLOB
+    const EXCHANGE_CONTRACT = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
     const domain = {
       name: 'Polymarket CTF Exchange',
       version: '1',
       chainId: 137, // Polygon
+      verifyingContract: EXCHANGE_CONTRACT,
     };
 
     const types = {
@@ -145,22 +147,34 @@ class CLOBClient {
       ],
     };
 
-    const makerAmount = Math.floor(request.amount * 1e6).toString(); // USDC 6 decimals
-    const takerAmount = Math.floor(request.amount * request.price * 1e6).toString();
+    // For BUY: makerAmount = USDC spent, takerAmount = outcome tokens received
+    // For SELL: makerAmount = outcome tokens sold, takerAmount = USDC received
+    // Price is in USDC per outcome token (0-1 range)
+    const isBuy = request.side === 'BUY';
+    const usdcAmount = Math.floor(request.amount * 1e6); // USDC 6 decimals
+    const outcomeAmount = Math.floor((request.amount / request.price) * 1e6);
+    
+    const makerAmount = isBuy ? usdcAmount.toString() : outcomeAmount.toString();
+    const takerAmount = isBuy ? outcomeAmount.toString() : usdcAmount.toString();
+
+    // Get the EOA wallet address (signer) — distinct from proxy (maker)
+    const { getAgentWallet } = await import('./wallet');
+    const eoaWallet = getAgentWallet(agentId);
+    if (!eoaWallet) throw new Error(`No wallet found for agent ${agentId}`);
 
     const value = {
       salt: nonce,
-      maker: proxyWallet,
-      signer: proxyWallet,
-      taker: '0x0000000000000000000000000000000000000000',
+      maker: proxyWallet,                                    // CRITICAL: Proxy address (Gnosis Safe)
+      signer: eoaWallet.address,                             // CRITICAL: EOA that signs
+      taker: '0x0000000000000000000000000000000000000000',    // Open order
       tokenId: request.marketId,
       makerAmount,
       takerAmount,
       expiration,
       nonce,
       feeRateBps: '0',
-      side: request.side === 'BUY' ? 0 : 1,
-      signatureType: 0,
+      side: isBuy ? 0 : 1,
+      signatureType: 0,                                      // 0 = EOA signature
     };
 
     // Sign the order

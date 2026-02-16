@@ -63,6 +63,9 @@ export const config = {
 
   // Operator wallet
   OPERATOR_PRIVATE_KEY: env('OPERATOR_PRIVATE_KEY', ''),
+  
+  // Polymarket proxy/funder wallet (Gnosis Safe address)
+  FUNDER_ADDRESS: env('FUNDER_ADDRESS', ''),
 
   // Risk defaults
   DEFAULT_MAX_POSITION_PCT: envNum('DEFAULT_MAX_POSITION_PCT', 0.20),

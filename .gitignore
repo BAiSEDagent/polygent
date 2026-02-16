@@ -6,3 +6,4 @@ logs/
 package-lock.json
 miniapp/.next
 miniapp/node_modules
+.next
