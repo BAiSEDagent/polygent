@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains' });
 
 export const metadata: Metadata = {
-  title: 'Project Codex: Cogent AI',
+  title: 'Project Codex: Polygent AI',
   description: 'Agentic trading terminal prototype for Polymarket.',
 };
 

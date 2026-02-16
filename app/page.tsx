@@ -13,7 +13,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-void-black px-4 py-4 lg:px-6">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-white/10 bg-surface-panel px-4 py-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-wide text-slate-100">COGENT // AGENT TRADING TERMINAL</h1>
+          <h1 className="text-lg font-semibold tracking-wide text-slate-100">POLYGENT // AGENT TRADING TERMINAL</h1>
           <p className="font-mono text-xs text-slate-400">NASA Mission Control x Matrix · Polymarket Builder Stack</p>
         </div>
         <div className="flex items-center gap-3 font-mono text-xs">

@@ -1,4 +1,4 @@
-# Cogent AI — Agent Trading Terminal Prototype
+# Polygent AI — Agent Trading Terminal Prototype
 
 High-fidelity Next.js prototype for an agentic Polymarket trading platform.
 
