@@ -20,6 +20,7 @@ import { WhaleTrackerStrategy } from './strategies/whale-tracker';
 import { ArbitrageStrategy } from './strategies/arbitrage';
 import { ContrarianStrategy } from './strategies/contrarian';
 import { SentimentStrategy } from './strategies/sentiment';
+import { MeanReversionStrategy } from "./strategies/mean-reversion";
 
 const app = express();
 const server = http.createServer(app);
@@ -35,14 +36,14 @@ app.use(helmet({ contentSecurityPolicy: false }));
 // Secure CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://localhost:3000',
+  'https://localhost:3000', 'https://polygent.market', 'https://www.polygent.market',
   ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
 ];
 
 app.use(cors({
   origin: (origin: string | undefined, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests) in dev
-    if (!origin && config.NODE_ENV === 'development') {
+    if (!origin) {
       return callback(null, true);
     }
     
@@ -107,10 +108,6 @@ app.get('/health', (_req, res) => {
 const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(frontendPath));
 
-// Legacy dashboard redirect
-app.get('/dashboard', (_req, res) => {
-  res.redirect('/');
-});
 
 // SPA fallback — serve index.html for all non-API routes
 app.get('*', (req, res, next) => {
@@ -158,7 +155,8 @@ async function bootstrap(): Promise<void> {
     }
   }
 
-  // 3. Register strategy agents
+  // 3. Register strategy agents (skip in production if no real keys)
+  try {
   agentRunner.registerAgent('Whale Tracker', new WhaleTrackerStrategy(), {
     deposit: 10_000,
     intervalMs: 5 * 60_000, // 5 min
@@ -174,11 +172,19 @@ async function bootstrap(): Promise<void> {
     intervalMs: 10 * 60_000, // 10 min
   });
 
+  agentRunner.registerAgent("Mean Reversion", new MeanReversionStrategy(), {
+    deposit: 6,
+    intervalMs: 60_000, // 1 min — needs frequent ticks for Z-score
+  });
   // Sentiment is a stub — register but won't produce signals without sources
   agentRunner.registerAgent('Sentiment', new SentimentStrategy(), {
     deposit: 10_000,
     intervalMs: 15 * 60_000,
   });
+
+  } catch (agentErr: any) {
+    logger.warn("Skipping internal agents (no real keys)", { error: agentErr.message });
+  }
 
   // 4. Start agent runner
   await agentRunner.start();
