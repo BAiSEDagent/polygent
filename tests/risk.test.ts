@@ -156,8 +156,8 @@ describe('Risk Engine', () => {
 
     it('should approve orders when drawdown is within threshold', () => {
       const agent = makeAgent({
-        config: { maxDrawdownPct: 0.30 },
-        equity: { current: 8000, peakEquity: 10_000, deposited: 10_000, dailyStartEquity: 10_000 },
+        config: { maxDrawdownPct: 0.30, dailyLossLimitPct: 0.25 },
+        equity: { current: 8000, peakEquity: 10_000, deposited: 10_000, dailyStartEquity: 8000 },
       });
       const result = evaluateRisk(agent, makeOrder());
       expect(result.approved).toBe(true);
@@ -176,7 +176,7 @@ describe('Risk Engine', () => {
   describe('Exposure Cap', () => {
     it('should reject orders that would exceed total exposure cap', () => {
       const agent = makeAgent({
-        config: { maxExposure: 1.0 },
+        config: { maxExposure: 1.0, maxPositionPct: 1.0 }, // Raise position limit so exposure fires
         equity: { current: 1000, peakEquity: 1000, deposited: 1000, dailyStartEquity: 1000 },
       });
       (tradeStore.getAgentExposure as jest.Mock).mockReturnValue(800);

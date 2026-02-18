@@ -42,19 +42,12 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin: string | undefined, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests) in dev
+    // Allow requests with no origin (curl, server-to-server) ONLY in dev
     if (!origin) {
-      return callback(null, true);
+      return callback(null, config.NODE_ENV === 'development');
     }
-    
-    if (origin && allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
-    } else if (!origin) {
-      if (config.NODE_ENV === 'development') {
-        callback(null, true);
-      } else {
-        callback(new Error('Origin header required'));
-      }
     } else {
       callback(new Error('Not allowed by CORS'));
     }

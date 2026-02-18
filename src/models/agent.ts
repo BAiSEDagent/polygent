@@ -2,6 +2,7 @@ import { Agent, AgentConfig, AgentStatus } from '../utils/types';
 import { config } from '../config';
 import { setAgentPrivateKey } from '../core/key-store';
 import { sanitizeObject } from '../utils/sanitize';
+import { validateConfigOverrides } from '../utils/validate-config';
 
 const DEFAULT_CONFIG: AgentConfig = {
   maxPositionPct: config.DEFAULT_MAX_POSITION_PCT,
@@ -39,7 +40,7 @@ class AgentStore {
       // privateKey is now stored securely in key store
       proxyWallet: null,
       status: 'active',
-      config: { ...DEFAULT_CONFIG, ...(params.configOverrides ? sanitizeObject(params.configOverrides) : {}) },
+      config: { ...DEFAULT_CONFIG, ...validateConfigOverrides(params.configOverrides ? sanitizeObject(params.configOverrides) : undefined) },
       equity: {
         deposited: params.deposit ?? 1000,
         current: params.deposit ?? 1000,

@@ -69,6 +69,8 @@ export interface OrderRequest {
   maxSlippage?: number; // Optional slippage protection (default 2%)
 }
 
+export type TradeSource = 'live' | 'paper' | 'mock';
+
 export interface Order {
   id: string;
   agentId: string;
@@ -81,6 +83,7 @@ export interface Order {
   status: OrderStatus;
   filledAmount: number;
   clobOrderId: string | null;
+  source: TradeSource;
   createdAt: number;
   updatedAt: number;
 }
@@ -94,6 +97,7 @@ export interface Trade {
   outcome: OrderOutcome;
   amount: number;
   price: number;
+  source: TradeSource;
   timestamp: number;
 }
 

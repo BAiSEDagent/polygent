@@ -7,7 +7,7 @@ import { clobClient } from '../core/clob';
 import { tradeStore } from '../models/trade';
 import { agentStore } from '../models/agent';
 import { broadcastTrade } from '../core/data-feed';
-import { Agent, Order, OrderRequest, Trade } from '../utils/types';
+import { Agent, Order, OrderRequest, Trade, TradeSource } from '../utils/types';
 import { getAgentMutex } from '../utils/mutex';
 
 const router = Router();
@@ -45,6 +45,10 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
       return;
     }
 
+    // Determine trade source
+    const { config: appConfig } = require('../config');
+    const source: TradeSource = appConfig.TRADING_MODE === 'live' ? 'live' : 'paper';
+
     // Create order record
     const orderId = `ord_${uuid().replace(/-/g, '').slice(0, 16)}`;
     const order: Order = {
@@ -59,6 +63,7 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
       status: 'pending',
       filledAmount: 0,
       clobOrderId: null,
+      source,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -77,7 +82,8 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
         status: 'open',
       });
 
-      // Record trade
+      // Record trade — tag source; mock if CLOB returned mock ID
+      const tradeSource: TradeSource = result.orderId.startsWith('mock_') ? 'mock' : source;
       const trade: Trade = {
         id: `trd_${uuid().replace(/-/g, '').slice(0, 16)}`,
         orderId,
@@ -87,6 +93,7 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
         outcome: body.outcome,
         amount: body.amount,
         price: body.price,
+        source: tradeSource,
         timestamp: Date.now(),
       };
       tradeStore.addTrade(trade);

@@ -210,11 +210,11 @@ class CLOBClient {
 
       return { orderId: result.orderID, status: result.status };
     } catch (error) {
-      // For development: return a mock response
+      // For development: return a mock response (tagged as mock)
       if (config.NODE_ENV === 'development') {
         const mockId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         logger.warn(`CLOB unavailable in dev mode, returning mock order`, { mockId });
-        return { orderId: mockId, status: 'open' };
+        return { orderId: mockId, status: 'open', source: 'mock' as const };
       }
       throw error;
     }

@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 node_modules/
 dist/
 logs/
@@ -6,4 +8,7 @@ logs/
 package-lock.json
 miniapp/.next
 miniapp/node_modules
-.next
+.next/
+frontend/dist/
+.next/
+frontend/dist/
