@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { Order, OrderRequest, OrderSide, OrderOutcome } from '../utils/types';
@@ -26,19 +27,67 @@ class CLOBClient {
   private baseUrl: string;
   private builderId: string;
   private builderApiKey: string;
+  private builderSecret: string;
+  private builderPassphrase: string;
+  private builderAddress: string;
 
   constructor() {
     this.baseUrl = config.POLYMARKET_CLOB_URL;
     this.builderId = config.BUILDER_ID;
     this.builderApiKey = config.BUILDER_API_KEY;
+    this.builderSecret = config.BUILDER_SECRET;
+    this.builderPassphrase = config.BUILDER_PASSPHRASE;
+    this.builderAddress = config.BUILDER_ADDRESS;
   }
 
-  private headers(): Record<string, string> {
+  /**
+   * Generate Polymarket L2 HMAC-SHA256 auth headers for authenticated endpoints.
+   * Signature = HMAC-SHA256(timestamp + METHOD + path + body, base64(secret))
+   */
+  private l2AuthHeaders(
+    method: string,
+    path: string,
+    body: string = ''
+  ): Record<string, string> {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const message = timestamp + method.toUpperCase() + path + body;
+    const secret = Buffer.from(this.builderSecret, 'base64');
+    const signature = crypto.createHmac('sha256', secret).update(message).digest('base64');
+
     return {
-      'Content-Type': 'application/json',
-      'X-Builder-Id': this.builderId,
-      ...(this.builderApiKey ? { Authorization: `Bearer ${this.builderApiKey}` } : {}),
+      'POLY_ADDRESS': this.builderAddress,
+      'POLY_SIGNATURE': signature,
+      'POLY_TIMESTAMP': timestamp,
+      'POLY_NONCE': '0',
+      'POLY_PASSPHRASE': this.builderPassphrase,
     };
+  }
+
+  /**
+   * Base headers for all requests (public endpoints).
+   * Builder attribution is included on every request.
+   */
+  private headers(
+    method?: string,
+    path?: string,
+    body?: string
+  ): Record<string, string> {
+    const base: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Include builder attribution if configured
+    if (this.builderAddress) {
+      base['POLY_ADDRESS'] = this.builderAddress;
+    }
+
+    // Include L2 auth for authenticated endpoints (POST, DELETE)
+    if (method && path && (method === 'POST' || method === 'DELETE')) {
+      const auth = this.l2AuthHeaders(method, path, body ?? '');
+      Object.assign(base, auth);
+    }
+
+    return base;
   }
 
   /** Fetch current orderbook for a token */
@@ -49,7 +98,7 @@ class CLOBClient {
     const url = `${this.baseUrl}/book?token_id=${tokenId}`;
     logger.debug(`Fetching orderbook for ${tokenId}`);
 
-    const response = await fetch(url, { headers: this.headers() });
+    const response = await fetch(url, { headers: this.headers('GET', '/book') });
     if (!response.ok) {
       throw new Error(`CLOB orderbook error: ${response.status} ${await response.text()}`);
     }
@@ -180,19 +229,24 @@ class CLOBClient {
     // Sign the order
     const signature = await signOrder(agentId, domain, types, value);
 
-    // Submit to CLOB
+    // Submit to CLOB — include builder address for fee attribution
     const payload = {
       order: {
         ...value,
         signature,
       },
+      // Builder attribution: tells Polymarket which builder routed this order
+      // This is what unlocks the $25k/week builder fee pool
+      ...(this.builderAddress ? { owner: this.builderAddress } : {}),
     };
+
+    const bodyStr = JSON.stringify(payload);
 
     try {
       const response = await fetch(`${this.baseUrl}/order`, {
         method: 'POST',
-        headers: this.headers(),
-        body: JSON.stringify(payload),
+        headers: this.headers('POST', '/order', bodyStr),
+        body: bodyStr,
       });
 
       if (!response.ok) {
@@ -214,7 +268,7 @@ class CLOBClient {
       if (config.NODE_ENV === 'development') {
         const mockId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         logger.warn(`CLOB unavailable in dev mode, returning mock order`, { mockId });
-        return { orderId: mockId, status: 'open', source: 'mock' as const };
+        return { orderId: mockId, status: 'open' };
       }
       throw error;
     }
@@ -222,10 +276,11 @@ class CLOBClient {
 
   /** Cancel an order on the CLOB */
   async cancelOrder(clobOrderId: string): Promise<boolean> {
+    const path = `/order/${clobOrderId}`;
     try {
-      const response = await fetch(`${this.baseUrl}/order/${clobOrderId}`, {
+      const response = await fetch(`${this.baseUrl}${path}`, {
         method: 'DELETE',
-        headers: this.headers(),
+        headers: this.headers('DELETE', path),
       });
 
       if (!response.ok) {
@@ -249,7 +304,7 @@ class CLOBClient {
     try {
       const response = await fetch(
         `${this.baseUrl}/orders?maker=${proxyWallet}&status=open`,
-        { headers: this.headers() }
+        { headers: this.headers('GET', '/orders') }
       );
       if (!response.ok) return [];
       return (await response.json()) as any[];

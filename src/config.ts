@@ -54,6 +54,9 @@ export const config = {
   POLYMARKET_CLOB_URL: env('POLYMARKET_CLOB_URL', 'https://clob.polymarket.com'),
   BUILDER_ID: env('BUILDER_ID', ''),
   BUILDER_API_KEY: env('BUILDER_API_KEY', ''),
+  BUILDER_SECRET: env('BUILDER_SECRET', ''),
+  BUILDER_PASSPHRASE: env('BUILDER_PASSPHRASE', ''),
+  BUILDER_ADDRESS: env('BUILDER_ADDRESS', ''),
 
   // Data APIs
   GAMMA_API_URL: env('GAMMA_API_URL', 'https://gamma-api.polymarket.com'),
