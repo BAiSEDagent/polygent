@@ -127,6 +127,7 @@ class PaperTradingEngine {
       outcome: signal.outcome,
       amount: signal.suggestedSize,
       price: executedPrice,
+      source: 'paper',
       timestamp: Date.now(),
     };
     tradeStore.addTrade(trade);
@@ -144,6 +145,7 @@ class PaperTradingEngine {
       status: 'filled',
       filledAmount: signal.suggestedSize,
       clobOrderId: null,
+      source: 'paper',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
