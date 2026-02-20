@@ -108,15 +108,15 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
   const hasMore = agents.length > PREVIEW_COUNT;
 
   return (
-    // Fill the sticky left rail completely — flex column layout
+    // Fluid height — grows with content; only the rows scroll internally
     <section
       className="rounded-sm flex flex-col"
       style={{
         border:          `1px solid ${T.border.DEFAULT}`,
         backgroundColor: 'rgba(5,5,5,0.6)',
-        // Fills available rail height from Dashboard's constrained container
-        height:          '100%',
-        overflow:        'hidden',
+        // No rigid height — section fits content naturally
+        minHeight:       0,
+        overflow:        'visible',
       }}
     >
       {/* Header */}
@@ -142,11 +142,13 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
         <span style={{ textAlign: 'right' }}>AUM</span>
       </div>
 
-      {/* Rows — always scrollable within the rail; no layout push */}
+      {/* Rows — explicit max-h so only rows scroll, header/footer stay fixed */}
       <div
-        className="flex-1 px-4 overflow-y-auto"
+        className="px-4 overflow-y-auto"
         style={{
-          // Electric Blue thin scrollbar consistent with rest of terminal
+          // 500px cap — scrollable internal rail, never clips header or VIEW ALL
+          maxHeight:      '500px',
+          // Electric Blue thin-rail scrollbar
           scrollbarWidth: 'thin',
           scrollbarColor: `${T.color.blue} rgba(0,0,0,0.4)`,
           display:        'flex',

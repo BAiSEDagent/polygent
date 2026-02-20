@@ -57,15 +57,13 @@ export function Dashboard() {
             alignItems: 'start',
           }}
         >
-          {/* LEFT RAIL — Leaderboard, sticky, smoked glass */}
+          {/* LEFT RAIL — Leaderboard, sticky */}
           <div
             className="xl:sticky"
             style={{
-              top: '8px',
-              maxHeight: 'calc(100vh - 140px)',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
+              top:      '8px',
+              // No overflow clipping — Leaderboard manages its own internal scroll
+              overflow: 'visible',
             }}
           >
             <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
