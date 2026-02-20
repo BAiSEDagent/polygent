@@ -21,7 +21,7 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
   const fmt = (n: number) => {
     if (n >= 1_000_000) return `$${(n/1_000_000).toFixed(2)}M`;
     if (n >= 1_000)     return `$${(n/1_000).toFixed(1)}k`;
-    return `$${n.toLocaleString(undefined,{maximumFractionDigits:0})}`;
+    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   };
 
   const pnlPos   = stats.pnl >= 0;
@@ -31,7 +31,11 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
     { label: 'NETWORK VOL',   value: fmt(stats.volume),       color: T.text.primary, energyBar: true,  glow: false },
     { label: 'ACTIVE AGENTS', value: String(stats.agents),    color: T.color.blue,   energyBar: false, glow: false },
     { label: '24H TRADES',    value: String(stats.trades24h), color: T.text.primary, energyBar: false, glow: false },
-    { label: 'GLOBAL PNL',    value: `${pnlPos?'+':''}${stats.pnl.toFixed(2)}%`, color: pnlColor, energyBar: false, glow: true },
+    {
+      label: 'GLOBAL PNL',
+      value: `${pnlPos ? '+' : ''}${stats.pnl.toFixed(2)}%`,
+      color: pnlColor, energyBar: false, glow: true,
+    },
   ];
 
   return (
@@ -44,22 +48,18 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
         .stat-energy-bar { animation: energy-pulse 3s ease-in-out infinite; }
       `}</style>
 
-      {/* ── Unified Smoked Glass Rail ─────────────────────────────────────── */}
+      {/* ── Solid Black Hardware Rail ─────────────────────────────────────── */}
       <div
         style={{
-          position:        'relative',
-          display:         'grid',
+          display:             'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
-          // Single continuous smoked glass rail — all 4 cells share one glass floor
-          backgroundColor:     'rgba(0,0,0,0.55)',
-          backdropFilter:      'blur(20px)',
-          WebkitBackdropFilter:'blur(20px)',
-          backgroundImage:     T.grid.imageSubtle,
-          backgroundSize:      T.grid.size,
+          backgroundColor:     '#050505',           // solid black bar
+          borderBottom:        '1px solid rgba(255,255,255,0.10)',
+          // P&L ambient glow spills downward
           boxShadow: pnlPos
-            ? 'inset 0 2px 16px rgba(0,0,0,0.7), 0 12px 40px rgba(34,197,94,0.08)'
-            : 'inset 0 2px 16px rgba(0,0,0,0.7), 0 12px 40px rgba(239,68,68,0.06)',
-          borderBottom:    '1px solid rgba(255,255,255,0.08)',
+            ? '0 8px 30px rgba(34,197,94,0.07)'
+            : '0 8px 30px rgba(239,68,68,0.05)',
+          position: 'relative',
         }}
       >
         {cells.map((c, i) => (
@@ -68,11 +68,20 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
             style={{
               position:   'relative',
               overflow:   'hidden',
-              padding:    '14px 16px',
-              borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              // Etched divider between each module bay
+              borderRight: i < cells.length - 1
+                ? '1px solid rgba(255,255,255,0.10)'
+                : 'none',
+              // Inner depth — numbers sit inside a recessed slot
+              boxShadow: 'inset 0 0 40px rgba(0,0,0,0.8)',
+              // Flex column: label top-left, value centered
+              display:        'flex',
+              flexDirection:  'column',
+              minHeight:      '88px',
+              padding:        '10px 16px 12px',
             }}
           >
-            {/* 1px Electric Blue Energy Bar on Network Vol only */}
+            {/* 1px Electric Blue Energy Bar — Network Vol only */}
             {c.energyBar && (
               <div
                 className="stat-energy-bar"
@@ -83,52 +92,58 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
               />
             )}
 
-            {/* Label — top-left, 10px, bold mono, 30% opacity (ALL cells) */}
+            {/* Label — top-left, 10px, bold mono, 30% opacity */}
             <div
-              className="font-bold font-mono"
+              className="font-bold font-mono shrink-0"
               style={{
-                fontSize:'10px', letterSpacing:'0.12em', textTransform:'uppercase',
-                color: T.text.muted, opacity: 0.3, marginBottom: '8px',
+                fontSize:      '10px',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color:         T.text.muted,
+                opacity:       0.3,
               }}
             >
               {c.label}
             </div>
 
-            {/* Value */}
+            {/* Value — centered in the remaining bay space */}
             <div
-              className="font-bold font-mono tracking-tight"
               style={{
-                fontSize: '2.25rem', color: c.color, lineHeight: 1,
-                textShadow: c.glow
-                  ? pnlPos
-                    ? '0 0 20px rgba(34,197,94,0.7),0 0 50px rgba(34,197,94,0.25)'
-                    : '0 0 20px rgba(239,68,68,0.6),0 0 40px rgba(239,68,68,0.2)'
-                  : 'none',
+                flex:           1,
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
               }}
             >
-              {c.value}
+              <div
+                className="font-bold font-mono tracking-tight"
+                style={{
+                  fontSize:   '2rem',
+                  color:      c.color,
+                  lineHeight: 1,
+                  textShadow: c.glow
+                    ? pnlPos
+                      ? '0 0 20px rgba(34,197,94,0.7), 0 0 50px rgba(34,197,94,0.25)'
+                      : '0 0 20px rgba(239,68,68,0.6), 0 0 40px rgba(239,68,68,0.2)'
+                    : 'none',
+                }}
+              >
+                {c.value}
+              </div>
             </div>
           </div>
         ))}
 
-        {/* ── Data Filament — 1px Blue/Indigo gradient dropping toward EXECUTING ── */}
-        {/* Positioned at ~62% from left (center of 3rd column in 4-col ops board  */}
-        {/* within the center 1fr of a [280px|1fr|300px] cockpit layout)            */}
+        {/* Data Filament — drops from stats rail toward EXECUTING column */}
         <div
           aria-hidden
           style={{
             position:   'absolute',
             bottom:     '-16px',
-            // Target the EXECUTING column: offset 280px rail + (OpsBoard 3rd col of 4)
-            // Approximated as 280px + ~62% of center = ~calc(280px + 62%) from page edge
-            // Within MissionControl we position from left relative to this container:
-            // OpsBoard start ≈ 280px + 16px gap = 296px from page left
-            // EXECUTING col center ≈ 296px + (100% - 296px - 300px - 16px) * 0.625
-            // Simpler: use left: 59% to visually target the executing column
             left:       '59%',
             width:      '1px',
             height:     '16px',
-            background: 'linear-gradient(to bottom, rgba(99,102,241,0.9), rgba(59,130,246,0.0))',
+            background: 'linear-gradient(to bottom, rgba(99,102,241,0.9), transparent)',
             zIndex:     10,
           }}
         />
