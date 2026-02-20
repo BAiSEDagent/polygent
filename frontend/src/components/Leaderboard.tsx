@@ -49,75 +49,108 @@ function AgentPod({ agent, rank, onSelectAgent }: {
   const pnlPos = pnlPct >= 0;
 
   return (
-    <button
-      onClick={() => onSelectAgent(agent)}
-      className="flex-1 text-left transition-all rounded-sm"
-      style={{
-        // Smoked glass pod
-        backgroundColor:     'rgba(0,0,0,0.6)',
-        backdropFilter:      'blur(12px)',
-        WebkitBackdropFilter:'blur(12px)',
-        border:              `1px solid ${T.border.subtle}`,
-        backgroundImage:     T.grid.imageSubtle,
-        backgroundSize:      T.grid.size,
-        padding:             '10px 14px 12px',
-        display:             'flex',
-        flexDirection:       'column',
-        gap:                 '6px',
-        minWidth:            0,
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)';
-        e.currentTarget.style.boxShadow   = '0 0 16px rgba(59,130,246,0.12)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = T.border.subtle;
-        e.currentTarget.style.boxShadow   = 'none';
-      }}
-    >
-      {/* Top row: rank glyph + ROI pill */}
-      <div className="flex items-center justify-between">
-        <span
-          className="font-bold font-mono"
-          style={{ fontSize: '13px', color: rs.color, textShadow: rs.textShadow }}
-        >
-          {rs.label}
-        </span>
-        <span
-          className="font-bold font-mono"
-          style={{
-            fontSize:        '10px',
-            padding:         '2px 7px',
-            borderRadius:    '2px',
-            backgroundColor: pnlPos ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)',
-            border:          `1px solid ${pnlPos ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
-            color:           '#f4f4f5',
-          }}
-        >
-          {pnlPos ? '+' : ''}{pnlPct.toFixed(1)}%
-        </span>
-      </div>
 
-      {/* Agent name — white, bold monospace, fully visible */}
-      <div
-        className="font-bold font-mono truncate"
+    <div style={{ flex: 1, position: 'relative', minWidth: 0, display: 'flex' }}>
+      <button
+        onClick={() => onSelectAgent(agent)}
+        className="w-full text-left transition-all rounded-sm"
         style={{
-          fontSize:   '13px',
-          color:      '#f4f4f5',
-          lineHeight: 1.2,
+          // Smoked glass pod
+          backgroundColor:     'rgba(0,0,0,0.6)',
+          backdropFilter:      'blur(12px)',
+          WebkitBackdropFilter:'blur(12px)',
+          border:              `1px solid ${T.border.subtle}`,
+          backgroundImage:     T.grid.imageSubtle,
+          backgroundSize:      T.grid.size,
+          padding:             '10px 14px 12px',
+          display:             'flex',
+          flexDirection:       'column',
+          gap:                 '4px',
+          minWidth:            0,
+          width:               '100%',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)';
+          e.currentTarget.style.boxShadow   = '0 0 16px rgba(59,130,246,0.12)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.borderColor = T.border.subtle;
+          e.currentTarget.style.boxShadow   = 'none';
         }}
       >
-        {agent.agentName}
-      </div>
+        {/* Top row: rank glyph + ROI block */}
+        <div className="flex items-center justify-between">
+          <span
+            className="font-bold font-mono"
+            style={{ fontSize: '13px', color: rs.color, textShadow: rs.textShadow }}
+          >
+            {rs.label}
+          </span>
+          {/* ROI label (dimmed) + pill */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+            <span
+              className="font-bold font-mono"
+              style={{ fontSize: '8px', letterSpacing: '0.12em', color: T.text.muted, opacity: 0.3 }}
+            >
+              ROI
+            </span>
+            <span
+              className="font-bold font-mono"
+              style={{
+                fontSize:        '10px',
+                padding:         '2px 7px',
+                borderRadius:    '2px',
+                backgroundColor: pnlPos ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)',
+                border:          `1px solid ${pnlPos ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+                color:           '#f4f4f5',
+              }}
+            >
+              {pnlPos ? '+' : ''}{pnlPct.toFixed(1)}%
+            </span>
+          </div>
+        </div>
 
-      {/* AUM — electric blue */}
+        {/* Agent name — white, bold monospace, the STAR */}
+        <div
+          className="font-bold font-mono truncate"
+          style={{ fontSize: '13px', color: '#f4f4f5', lineHeight: 1.2, paddingTop: '2px' }}
+        >
+          {agent.agentName}
+        </div>
+
+        {/* AUM label (dimmed) + value (electric blue) */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', paddingTop: '2px' }}>
+          <span
+            className="font-bold font-mono"
+            style={{ fontSize: '8px', letterSpacing: '0.12em', color: T.text.muted, opacity: 0.3 }}
+          >
+            AUM
+          </span>
+          <span
+            className="font-bold font-mono"
+            style={{ fontSize: '12px', color: T.color.blue }}
+          >
+            {formatAum(agent.currentEquity ?? 0)}
+          </span>
+        </div>
+      </button>
+
+      {/* 1px Electric Blue filament — drops from pod bottom toward OpsBoard */}
       <div
-        className="font-bold font-mono"
-        style={{ fontSize: '12px', color: T.color.blue }}
-      >
-        {formatAum(agent.currentEquity ?? 0)}
-      </div>
-    </button>
+        aria-hidden
+        style={{
+          position:   'absolute',
+          bottom:     '-14px',
+          left:       '50%',
+          transform:  'translateX(-50%)',
+          width:      '1px',
+          height:     '14px',
+          background: 'linear-gradient(to bottom, rgba(59,130,246,0.8), rgba(59,130,246,0.0))',
+          pointerEvents: 'none',
+          zIndex:     5,
+        }}
+      />
+    </div>
   );
 }
 
@@ -183,12 +216,14 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
         )}
       </div>
 
-      {/* Horizontal pod rail */}
+      {/* Horizontal pod rail — paddingBottom gives filament room to drop */}
       <div
         style={{
-          display: 'flex',
-          gap:     '10px',
-          alignItems: 'stretch',
+          display:        'flex',
+          gap:            '10px',
+          alignItems:     'stretch',
+          paddingBottom:  '14px',
+          overflow:       'visible',
         }}
       >
         {visible.map((agent, i) => (
