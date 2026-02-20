@@ -6,8 +6,8 @@ interface LeaderboardProps {
   onSelectAgent: (agent: any) => void;
 }
 
-const COLS = '40px 1fr 88px 88px';
-const GAP  = '8px';
+const COLS = '30px 1fr 56px 54px';
+const GAP  = '5px';
 
 function getRankStyle(rank: number): { color: string; glow: string; label: string; size: string } {
   if (rank === 0) return {
@@ -55,7 +55,7 @@ function AgentRow({ agent, rank, onSelectAgent }: {
   return (
     <button
       onClick={() => onSelectAgent(agent)}
-      className="w-full font-mono text-left rounded-sm px-3 py-2.5 transition-all"
+      className="w-full font-mono text-left rounded-sm px-2 py-2.5 transition-all"
       style={{
         display: 'grid', gridTemplateColumns: COLS, gap: GAP, alignItems: 'center',
         backgroundColor:     'rgba(0,0,0,0.6)',
