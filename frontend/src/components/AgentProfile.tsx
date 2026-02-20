@@ -62,7 +62,7 @@ export function AgentProfile({ agent, onClose }: AgentProfileProps) {
         <div
           className="p-6 border-b border-white/10 flex items-start justify-between"
           style={{
-            background: '#050505',
+            backgroundColor: '#050505',
             backgroundImage:
               'linear-gradient(to right, rgba(100,116,139,0.18) 1px, transparent 1px), ' +
               'linear-gradient(to bottom, rgba(100,116,139,0.18) 1px, transparent 1px)',
@@ -88,18 +88,19 @@ export function AgentProfile({ agent, onClose }: AgentProfileProps) {
                   {agent.agentName?.toUpperCase().replace(/ /g, '_') || 'AGENT'}
                 </h1>
 
-                {/* ONLINE pill — solid filled green */}
+                {/* ONLINE pill — green border ghost, matching reference */}
                 <span
                   className="flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-mono font-semibold uppercase"
                   style={{
-                    background: '#22c55e',
-                    color: '#000',
+                    background: 'rgba(34,197,94,0.08)',
+                    border: '1px solid #22c55e',
+                    color: '#22c55e',
                     borderRadius: '9999px',
                   }}
                 >
                   <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#000' }} />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#000' }} />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#22c55e' }} />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#22c55e' }} />
                   </span>
                   ONLINE
                 </span>
