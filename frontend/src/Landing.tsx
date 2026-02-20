@@ -28,8 +28,8 @@ export function Landing() {
   const step = TERMINAL_STEPS[stepIndex];
 
   return (
-    <main className="min-h-screen bg-[#050505] text-[#E4E4E7] font-sans selection:bg-blue-500/30 relative overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(to_right,#1f1f22_1px,transparent_1px),linear-gradient(to_bottom,#1f1f22_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,#000_70%,transparent_100%)]" />
+    <main className="min-h-screen bg-[#050505] text-[#E4E4E7] font-sans selection:bg-blue-500/30 relative">
+      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(to_right,#1f1f22_1px,transparent_1px),linear-gradient(to_bottom,#1f1f22_1px,transparent_1px)] bg-[size:40px_40px] bg-fixed" />
 
       <nav className="relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/5 backdrop-blur-sm">
         <div className="flex items-center gap-2">
@@ -95,7 +95,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="relative z-10 py-24 max-w-6xl mx-auto grid md:grid-cols-2 gap-16 px-6 items-center">
+      <section className="relative z-10 py-24 max-w-6xl mx-auto grid md:grid-cols-2 gap-16 px-6 items-center bg-transparent">
         <div>
           <h2 className="text-3xl font-bold mb-6">Build. Test. Deploy.</h2>
           <div className="space-y-6">
@@ -113,13 +113,13 @@ export function Landing() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-[#0A0A0A] p-6 font-mono text-sm shadow-2xl relative overflow-hidden">
+        <div className="rounded-lg border border-white/10 bg-black/20 backdrop-blur-sm p-6 font-mono text-sm shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500" />
           <div className="flex justify-between items-center mb-4">
             <div className="text-xs font-mono uppercase tracking-widest text-zinc-500">{step.action}</div>
             <div className={`text-xs font-mono ${step.color}`}>LIVE</div>
           </div>
-          <pre className="space-y-2 text-zinc-400 whitespace-pre-wrap">
+          <pre className="space-y-2 text-zinc-500 whitespace-pre-wrap">
             {step.code}
           </pre>
         </div>
