@@ -7,32 +7,27 @@ interface HeaderProps {
 }
 
 export function Header({ wsConnected, marketsLoaded, agents }: HeaderProps) {
-  const activeBadge = T.badge.active;
-  const socketBadge = wsConnected ? T.badge.active : T.badge.inactive;
-
   return (
     <>
-      {/* CRT warm-up flicker + title glow keyframes */}
       <style>{`
+        /* CRT warm-up — fires once on mount */
         @keyframes crt-warmup {
-          0%   { opacity: 0; }
-          15%  { opacity: 0.9; }
-          25%  { opacity: 0.3; }
-          35%  { opacity: 1.0; }
-          42%  { opacity: 0.6; }
-          50%  { opacity: 1.0; }
-          100% { opacity: 1.0; }
+          0%   { opacity:0; }
+          15%  { opacity:0.9; }
+          25%  { opacity:0.3; }
+          35%  { opacity:1.0; }
+          42%  { opacity:0.6; }
+          50%  { opacity:1.0; }
+          100% { opacity:1.0; }
         }
-        .crt-title {
-          animation: crt-warmup 0.55s ease-out forwards;
+        .crt-title { animation: crt-warmup 0.55s ease-out forwards; }
+
+        /* Badge heartbeat — 3s, synced with sentiment rails & energy bar */
+        @keyframes badge-heartbeat {
+          0%,100% { box-shadow: 0 0 4px rgba(34,197,94,0.3);  opacity: 0.82; }
+          50%      { box-shadow: 0 0 14px rgba(34,197,94,0.9), 0 0 28px rgba(34,197,94,0.35); opacity: 1.0; }
         }
-        @keyframes energy-bar-pulse {
-          0%, 100% { opacity: 0.35; box-shadow: 0 0 4px rgba(59,130,246,0.4); }
-          50%       { opacity: 1.0;  box-shadow: 0 0 10px rgba(59,130,246,0.9), 0 0 20px rgba(59,130,246,0.4); }
-        }
-        .energy-bar {
-          animation: energy-bar-pulse 3s ease-in-out infinite;
-        }
+        .badge-live { animation: badge-heartbeat 3s ease-in-out infinite; }
       `}</style>
 
       <header
@@ -44,37 +39,27 @@ export function Header({ wsConnected, marketsLoaded, agents }: HeaderProps) {
       >
         {/* Left — CRT-etched brand */}
         <div className="crt-title">
-          {/* Main title — glass etch with projected glow */}
           <h1
             className="text-[15px] font-bold font-mono tracking-wide"
             style={{
               color:      'rgba(244,244,245,0.88)',
-              textShadow:
-                '0 0 12px rgba(255,255,255,0.25), ' +
-                '0 0 30px rgba(100,116,139,0.15)',
+              textShadow: '0 0 12px rgba(255,255,255,0.25),0 0 30px rgba(100,116,139,0.15)',
             }}
           >
-            POLYGENT{' '}
-            <span style={{ color: 'rgba(113,113,122,0.6)' }}>//</span>{' '}
-            AGENT TRADING TERMINAL
+            POLYGENT <span style={{ color: 'rgba(113,113,122,0.6)' }}>//</span> AGENT TRADING TERMINAL
           </h1>
-
-          {/* Subtitle — metadata etched into glass, 20% opacity */}
-          <p
-            className="text-[11px] font-mono mt-0.5"
-            style={{ color: T.text.muted, opacity: 0.2 }}
-          >
+          <p className="text-[11px] font-mono mt-0.5" style={{ color: T.text.muted, opacity: 0.2 }}>
             Polymarket Builder Stack · {marketsLoaded} markets · {agents} agents
           </p>
         </div>
 
-        {/* Right — LED status badges */}
+        {/* Right — LED badges with 3s heartbeat breathing pulse */}
         <div className="flex items-center gap-2.5">
 
           {/* LIVE SOCKET */}
           <div
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold rounded-sm"
-            style={socketBadge}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold rounded-sm${wsConnected ? ' badge-live' : ''}`}
+            style={wsConnected ? T.badge.active : T.badge.inactive}
           >
             <span className="relative flex h-2 w-2">
               <span
@@ -89,10 +74,10 @@ export function Header({ wsConnected, marketsLoaded, agents }: HeaderProps) {
             {wsConnected ? 'LIVE SOCKET' : 'DISCONNECTED'}
           </div>
 
-          {/* GASLESS EXECUTION */}
+          {/* GASLESS EXECUTION — always pulsing green */}
           <div
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold rounded-sm"
-            style={activeBadge}
+            className="badge-live flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold rounded-sm"
+            style={T.badge.active}
           >
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: '#000' }} />

@@ -228,6 +228,23 @@ export function OpsBoard({ activities }: { activities: any[] }) {
                 {/* Scan line — SIGNAL DETECTED column only */}
                 {isSignal && <div className="polygent-scan-line" />}
 
+                {/* Data Filament receiver — top of EXECUTING column only */}
+                {isExecuting && (
+                  <div
+                    aria-hidden
+                    style={{
+                      position:   'absolute',
+                      top:        0,
+                      left:       '50%',
+                      transform:  'translateX(-50%)',
+                      width:      '1px',
+                      height:     '16px',
+                      background: 'linear-gradient(to bottom, rgba(59,130,246,0.9), rgba(99,102,241,0.0))',
+                      zIndex:     20,
+                    }}
+                  />
+                )}
+
                 {/* Column header */}
                 <div
                   className="flex items-center gap-2 pb-2 mb-2.5"
