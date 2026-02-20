@@ -142,6 +142,12 @@ export function OpsBoard({ activities }: { activities: any[] }) {
           animation: polygent-scan 4s linear infinite;
           pointer-events: none;
         }
+        /* Electric Blue thin-rail scrollbar for Ops Board columns */
+        .polygent-col-scroll { scrollbar-width: thin; scrollbar-color: #3b82f6 rgba(0,0,0,0.4); }
+        .polygent-col-scroll::-webkit-scrollbar { width: 3px; }
+        .polygent-col-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); }
+        .polygent-col-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 2px; }
+        .polygent-col-scroll::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
       `}</style>
 
       <section
@@ -176,7 +182,7 @@ export function OpsBoard({ activities }: { activities: any[] }) {
             return (
               <div
                 key={stage}
-                className="rounded-sm p-2.5"
+                className="rounded-sm p-2.5 polygent-col-scroll"
                 style={{
                   // Recessed hardware bay — black/20 bg, vertical border-white/5 rails
                   backgroundColor: 'rgba(0,0,0,0.35)',
@@ -189,7 +195,8 @@ export function OpsBoard({ activities }: { activities: any[] }) {
                   minHeight:       '280px',
                   // Relative for scan-line absolute positioning
                   position:        'relative',
-                  overflow:        'hidden',
+                  overflowY:       'auto',
+                  maxHeight:       '520px',
                 }}
               >
                 {/* Scan line — SIGNAL DETECTED column only */}
@@ -222,7 +229,7 @@ export function OpsBoard({ activities }: { activities: any[] }) {
 
                 {/* Cards */}
                 <div className="space-y-2">
-                  {items.slice(0, 7).map(card => (
+                  {items.slice(0, 20).map(card => (
                     <TradeCard
                       key={card.id}
                       card={card}

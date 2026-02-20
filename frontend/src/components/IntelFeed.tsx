@@ -264,8 +264,10 @@ export function IntelFeed({ activities }: { activities: any[] }) {
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)')}
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
-                <span style={{ color: T.text.dim, flexShrink: 0 }}>
-                  [{formatTs(event.timestamp)}]
+                <span style={{ flexShrink: 0, fontWeight: 600 }}>
+                  <span style={{ color: T.color.blue }}>[</span>
+                  <span style={{ color: T.text.primary }}>{formatTs(event.timestamp)}</span>
+                  <span style={{ color: T.color.blue }}>]</span>
                 </span>
                 <span
                   className="font-bold ml-1 shrink-0"
