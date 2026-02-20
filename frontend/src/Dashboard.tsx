@@ -57,14 +57,15 @@ export function Dashboard() {
             alignItems: 'start',
           }}
         >
-          {/* LEFT RAIL — Leaderboard, sticky, definite height so child height:100% resolves */}
+          {/* LEFT RAIL — strict flex column, definite height, overflow hidden */}
           <div
             className="xl:sticky"
             style={{
-              top:      '8px',
-              // Definite height is REQUIRED — without it, height:100% on <section> resolves to auto
-              height:   'calc(100vh - 140px)',
-              overflow: 'hidden',
+              top:           '8px',
+              height:        'calc(100vh - 140px)',
+              display:       'flex',
+              flexDirection: 'column',
+              overflow:      'hidden',
             }}
           >
             <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />

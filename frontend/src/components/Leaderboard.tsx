@@ -108,14 +108,15 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
   const hasMore = agents.length > PREVIEW_COUNT;
 
   return (
-    // Locked flex-col — fills rail exactly; header + footer shrink-0; rows scroll
+    // Nuclear flex-lock: flex:1 1 0% + min-height:0 = "Golden Rule"
+    // Forces section to stay inside the rail and never expand past it
     <section
       className="rounded-sm flex flex-col"
       style={{
         border:          `1px solid ${T.border.DEFAULT}`,
         backgroundColor: 'rgba(5,5,5,0.6)',
-        // height:100% resolves because parent now has a definite height in Dashboard
-        height:          '100%',
+        flex:            '1 1 0%',
+        minHeight:       0,
         overflow:        'hidden',
       }}
     >
@@ -142,13 +143,12 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
         <span style={{ textAlign: 'right' }}>AUM</span>
       </div>
 
-      {/* Scroll zone — flex:1 fills remaining space after header+footer; rows scroll within */}
+      {/* Scroll body — flex:1 1 0% + min-height:0 fills ONLY space between header and button */}
       <div
-        className="px-4 overflow-y-auto"
+        className="px-4"
         style={{
-          // flex:1 = "take all remaining height after header and button are rendered"
-          // No max-height — flexbox owns the calculation. VIEW ALL is always visible below.
-          flex:           1,
+          flex:           '1 1 0%',
+          minHeight:      0,
           overflowY:      'auto',
           // Electric Blue thin-rail scrollbar
           scrollbarWidth: 'thin',
@@ -158,9 +158,6 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
           gap:            '6px',
           paddingBottom:  '8px',
           paddingTop:     '4px',
-          // Isolation — no z-index bleed onto the anchored button below
-          position:       'relative',
-          zIndex:         0,
         }}
       >
         {(expanded ? agents : agents.slice(0, PREVIEW_COUNT)).map((agent, i) => (
