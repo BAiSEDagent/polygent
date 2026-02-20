@@ -6,8 +6,8 @@ interface LeaderboardProps {
   onSelectAgent: (agent: any) => void;
 }
 
-const COLS = '30px 1fr 56px 54px';
-const GAP  = '5px';
+const COLS = '34px 1fr 68px 66px';
+const GAP  = '6px';
 
 function getRankStyle(rank: number): { color: string; glow: string; label: string; size: string } {
   if (rank === 0) return {

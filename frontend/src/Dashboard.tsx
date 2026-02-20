@@ -52,7 +52,7 @@ export function Dashboard() {
           style={{
             display: 'grid',
             // [Left rail: Leaderboard] [Center: Ops Board] [Right rail: Intel Feed]
-            gridTemplateColumns: '280px 1fr 300px',
+            gridTemplateColumns: '320px 1fr 300px',
             gap: '16px',
             alignItems: 'start',
           }}
