@@ -172,3 +172,70 @@
   backdrop-filter: blur(25px);
   -webkit-backdrop-filter: blur(25px);
 }
+
+/* =============================================================================
+   10. DUAL MAJOR/MINOR BLUEPRINT GRID — Electric Blue 20px/80px cadence
+   Minor grid: 20px intervals at rgba(0,82,255,0.05)
+   Major grid: 80px intervals at rgba(0,82,255,0.12)
+   Applied via .grid-bg on <body> in index.css
+   ============================================================================= */
+.grid-bg {
+  background-image:
+    repeating-linear-gradient(to right,  rgba(0, 82, 255, 0.05) 0px, rgba(0, 82, 255, 0.05) 1px, transparent 1px, transparent 20px),
+    repeating-linear-gradient(to bottom, rgba(0, 82, 255, 0.05) 0px, rgba(0, 82, 255, 0.05) 1px, transparent 1px, transparent 20px),
+    repeating-linear-gradient(to right,  rgba(0, 82, 255, 0.12) 0px, rgba(0, 82, 255, 0.12) 1px, transparent 1px, transparent 80px),
+    repeating-linear-gradient(to bottom, rgba(0, 82, 255, 0.12) 0px, rgba(0, 82, 255, 0.12) 1px, transparent 1px, transparent 80px);
+}
+
+/* =============================================================================
+   11. SCANLINE OVERLAY — Full-viewport CRT scanlines via body::after
+   --scanline-opacity CSS variable set in :root (index.css / inline)
+   z-index 9999, pointer-events none — never blocks interaction
+   ============================================================================= */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, var(--scanline-opacity, 0.08)) 2px,
+    rgba(0, 0, 0, var(--scanline-opacity, 0.08)) 4px
+  );
+}
+
+/* =============================================================================
+   12. ANIMATION PERFORMANCE — will-change hints for GPU compositing
+   Applied to all continuously animated elements to promote to own layer
+   ============================================================================= */
+.badge-live,
+.stat-energy-bar,
+.polygent-scan-line,
+.rail-green,
+.rail-red,
+.executing-hue-glow,
+.auth-cursor,
+.dot-pulse,
+.bridge-module,
+.pulse,
+.flicker,
+[class*="animate-"] {
+  will-change: transform;
+}
+
+/* =============================================================================
+   13. REDUCED MOTION — Respect user accessibility preferences
+   ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

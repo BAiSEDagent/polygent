@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Props {
@@ -5,19 +6,21 @@ interface Props {
 }
 
 export default function PnLChart({ data }: Props) {
-  if (!data.length) {
-    // Generate mock curve if no data
-    const mock = Array.from({ length: 48 }, (_, i) => ({
+  // Stable mock data — only generated once when data is empty, not on every render
+  const mockData = useMemo(() => {
+    return Array.from({ length: 48 }, (_, i) => ({
       time: `${Math.floor(i / 2)}:${i % 2 === 0 ? '00' : '30'}`,
       value: 39800 + Math.random() * 200 + i * 10 + Math.sin(i / 3) * 100,
     }));
-    data = mock;
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // empty deps — stable for lifetime of component
+
+  const chartData = data.length ? data : mockData;
 
   return (
     <div className="w-full h-full min-h-[200px]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
           <defs>
             <linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />

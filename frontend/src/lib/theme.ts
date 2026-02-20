@@ -99,6 +99,14 @@ export const INDUSTRIAL_THEME = {
     },
   },
 
+  // ── Visual overhaul tokens (dual grid + scanlines) ────────────────────────
+  // Mirrors: industrial.css sections 10–11 and :root --scanline-opacity
+  overhaul: {
+    gridMinorColor:  'rgba(0,82,255,0.05)',
+    gridMajorColor:  'rgba(0,82,255,0.12)',
+    scanlineOpacity: 0.08,
+  },
+
   // ── Animation tokens — all durations and class names are defined here ──────
   // The keyframes themselves live in: frontend/src/styles/industrial.css
   animations: {
@@ -129,3 +137,8 @@ export const INDUSTRIAL_THEME = {
     },
   },
 } as const;
+
+// ── Standalone exports for visual overhaul tokens ─────────────────────────────
+export const gridMinorColor  = 'rgba(0,82,255,0.05)' as const;
+export const gridMajorColor  = 'rgba(0,82,255,0.12)' as const;
+export const scanlineOpacity = 0.08;

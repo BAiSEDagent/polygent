@@ -56,7 +56,7 @@ function classify(a: any): OpCard {
     agentName: a.agentName || a.agentId || 'Agent',
     market:    a.market || 'Unknown',
     size:      a.amount || 0,
-    roi:       a.pnl ?? (Math.random() * 20 - 3),
+    roi:       a.pnl ?? (((((a.id || a.timestamp || 0).toString().split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) * 9301 + 49297) % 233280) / 233280) * 20 - 3),
     stage,
   };
 }

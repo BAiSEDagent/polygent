@@ -57,7 +57,7 @@ export function useSimulation(realActivities: any[], enabled = true) {
       const newEvent = genEvent(counter.current++);
       newEvent.timestamp = Date.now();
       setSimEvents(prev => [newEvent, ...prev].slice(0, 80));
-    }, 1500 + Math.random() * 2000);
+    }, 3000 + Math.random() * 2000);
 
     return () => clearInterval(interval);
   }, [enabled]);

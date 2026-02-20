@@ -4,6 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
+:root { --scanline-opacity: 0.08; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { width: 100%; min-height: 100vh; overflow-x: hidden; overflow-y: auto !important; }
 body { background: #0A0B0E; color: #fff; font-family: 'Inter', system-ui, sans-serif; }
