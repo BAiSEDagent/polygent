@@ -3,6 +3,7 @@ import { config } from '../config';
 import { setAgentPrivateKey } from '../core/key-store';
 import { sanitizeObject } from '../utils/sanitize';
 import { validateConfigOverrides } from '../utils/validate-config';
+import { getDb } from '../core/db';
 
 const DEFAULT_CONFIG: AgentConfig = {
   maxPositionPct: config.DEFAULT_MAX_POSITION_PCT,
@@ -13,10 +14,43 @@ const DEFAULT_CONFIG: AgentConfig = {
   minDiversification: 3,
 };
 
-class AgentStore {
-  private agents = new Map<string, Agent>();
-  private apiKeyIndex = new Map<string, string>(); // hash → agentId
+interface AgentRow {
+  id: string;
+  name: string;
+  description: string | null;
+  strategy: string | null;
+  api_key_hash: string;
+  wallet_address: string | null;
+  proxy_wallet: string | null;
+  status: string;
+  config_json: string;
+  equity_json: string;
+  last_activity: number | null;
+  registered_via_api: number;
+  created_at: number;
+  updated_at: number;
+}
 
+function rowToModel(row: AgentRow): Agent {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    strategy: row.strategy ?? undefined,
+    apiKeyHash: row.api_key_hash,
+    walletAddress: row.wallet_address,
+    proxyWallet: row.proxy_wallet,
+    status: row.status as AgentStatus,
+    config: JSON.parse(row.config_json),
+    equity: JSON.parse(row.equity_json),
+    lastActivity: row.last_activity ?? undefined,
+    registeredViaApi: row.registered_via_api === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+class AgentStore {
   create(params: {
     id: string;
     name: string;
@@ -30,67 +64,120 @@ class AgentStore {
     registeredViaApi?: boolean;
   }): Agent {
     const now = Date.now();
-    const agent: Agent = {
-      id: params.id,
-      name: params.name,
-      description: params.description,
-      strategy: params.strategy,
-      apiKeyHash: params.apiKeyHash,
-      walletAddress: params.walletAddress,
-      // privateKey is now stored securely in key store
-      proxyWallet: null,
-      status: 'active',
-      config: { ...DEFAULT_CONFIG, ...validateConfigOverrides(params.configOverrides ? sanitizeObject(params.configOverrides) : undefined) },
-      equity: {
-        deposited: params.deposit ?? 1000,
-        current: params.deposit ?? 1000,
-        peakEquity: params.deposit ?? 1000,
-        dailyStartEquity: params.deposit ?? 1000,
-      },
-      lastActivity: now,
-      registeredViaApi: params.registeredViaApi ?? false,
-      createdAt: now,
-      updatedAt: now,
+    const agentConfig = {
+      ...DEFAULT_CONFIG,
+      ...validateConfigOverrides(params.configOverrides ? sanitizeObject(params.configOverrides) : undefined),
     };
-    
+    const equity = {
+      deposited: params.deposit ?? 1000,
+      current: params.deposit ?? 1000,
+      peakEquity: params.deposit ?? 1000,
+      dailyStartEquity: params.deposit ?? 1000,
+    };
+
+    getDb().prepare(`
+      INSERT INTO agents
+        (id, name, description, strategy, api_key_hash, wallet_address, proxy_wallet, status,
+         config_json, equity_json, last_activity, registered_via_api, created_at, updated_at)
+      VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      params.id,
+      params.name,
+      params.description ?? null,
+      params.strategy ?? null,
+      params.apiKeyHash,
+      params.walletAddress,
+      null,
+      'active',
+      JSON.stringify(agentConfig),
+      JSON.stringify(equity),
+      now,
+      (params.registeredViaApi ?? false) ? 1 : 0,
+      now,
+      now,
+    );
+
     // Store private key securely
-    setAgentPrivateKey(agent.id, params.privateKey);
-    
-    this.agents.set(agent.id, agent);
-    this.apiKeyIndex.set(params.apiKeyHash, agent.id);
-    return agent;
+    setAgentPrivateKey(params.id, params.privateKey);
+
+    return this.get(params.id)!;
   }
 
   get(id: string): Agent | undefined {
-    return this.agents.get(id);
+    const row = getDb()
+      .prepare('SELECT * FROM agents WHERE id = ?')
+      .get(id) as AgentRow | undefined;
+    return row ? rowToModel(row) : undefined;
   }
 
   findByApiKeyHash(hash: string): Agent | undefined {
-    const id = this.apiKeyIndex.get(hash);
-    return id ? this.agents.get(id) : undefined;
+    const row = getDb()
+      .prepare('SELECT * FROM agents WHERE api_key_hash = ?')
+      .get(hash) as AgentRow | undefined;
+    return row ? rowToModel(row) : undefined;
   }
 
   list(): Agent[] {
-    return Array.from(this.agents.values());
+    const rows = getDb()
+      .prepare('SELECT * FROM agents')
+      .all() as AgentRow[];
+    return rows.map(rowToModel);
   }
 
   update(id: string, updates: Partial<Agent>): Agent | undefined {
-    const agent = this.agents.get(id);
-    if (!agent) return undefined;
-    const updated = { ...agent, ...sanitizeObject(updates), updatedAt: Date.now() };
-    this.agents.set(id, updated);
-    return updated;
+    const existing = this.get(id);
+    if (!existing) return undefined;
+
+    const merged = { ...existing, ...sanitizeObject(updates), updatedAt: Date.now() };
+
+    getDb().prepare(`
+      UPDATE agents SET
+        name = ?,
+        description = ?,
+        strategy = ?,
+        api_key_hash = ?,
+        wallet_address = ?,
+        proxy_wallet = ?,
+        status = ?,
+        config_json = ?,
+        equity_json = ?,
+        last_activity = ?,
+        registered_via_api = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(
+      merged.name,
+      merged.description ?? null,
+      merged.strategy ?? null,
+      merged.apiKeyHash,
+      merged.walletAddress,
+      merged.proxyWallet,
+      merged.status,
+      JSON.stringify(merged.config),
+      JSON.stringify(merged.equity),
+      merged.lastActivity ?? null,
+      merged.registeredViaApi ? 1 : 0,
+      merged.updatedAt,
+      id,
+    );
+
+    return this.get(id);
   }
 
   updateEquity(id: string, currentEquity: number): Agent | undefined {
-    const agent = this.agents.get(id);
+    const agent = this.get(id);
     if (!agent) return undefined;
-    agent.equity.current = currentEquity;
-    if (currentEquity > agent.equity.peakEquity) {
-      agent.equity.peakEquity = currentEquity;
-    }
-    agent.updatedAt = Date.now();
-    return agent;
+
+    const equity = { ...agent.equity, current: currentEquity };
+    if (currentEquity > equity.peakEquity) equity.peakEquity = currentEquity;
+    const now = Date.now();
+
+    getDb().prepare(`
+      UPDATE agents SET equity_json = ?, updated_at = ? WHERE id = ?
+    `).run(JSON.stringify(equity), now, id);
+
+    return this.get(id);
   }
 
   deactivate(id: string): Agent | undefined {
@@ -102,12 +189,17 @@ class AgentStore {
   }
 
   resetCircuitBreak(id: string): Agent | undefined {
-    const agent = this.agents.get(id);
+    const agent = this.get(id);
     if (!agent || agent.status !== 'circuit_break') return undefined;
-    agent.status = 'active';
-    agent.equity.dailyStartEquity = agent.equity.current;
-    agent.updatedAt = Date.now();
-    return agent;
+
+    const equity = { ...agent.equity, dailyStartEquity: agent.equity.current };
+    const now = Date.now();
+
+    getDb().prepare(`
+      UPDATE agents SET status = 'active', equity_json = ?, updated_at = ? WHERE id = ?
+    `).run(JSON.stringify(equity), now, id);
+
+    return this.get(id);
   }
 
   /**
@@ -126,38 +218,45 @@ class AgentStore {
     proxyWallet: string;    // Gnosis Safe — order maker / USDC holder
   }): Agent {
     const now = Date.now();
-    const agent: Agent = {
-      id: params.id,
-      name: params.name,
-      description: params.description,
-      strategy: params.strategy,
-      apiKeyHash: params.apiKeyHash,
-      walletAddress: params.walletAddress,
-      proxyWallet: params.proxyWallet,
-      status: 'active',
-      config: { ...DEFAULT_CONFIG },
-      // Equity is symbolic for external agents — they hold their own USDC.
-      // We track volume/PnL from recorded trades for Leaderboard display.
-      equity: {
-        deposited: 0,
-        current: 0,
-        peakEquity: 0,
-        dailyStartEquity: 0,
-      },
-      lastActivity: now,
-      registeredViaApi: true,
-      createdAt: now,
-      updatedAt: now,
+    const equity = {
+      deposited: 0,
+      current: 0,
+      peakEquity: 0,
+      dailyStartEquity: 0,
     };
 
+    getDb().prepare(`
+      INSERT INTO agents
+        (id, name, description, strategy, api_key_hash, wallet_address, proxy_wallet, status,
+         config_json, equity_json, last_activity, registered_via_api, created_at, updated_at)
+      VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      params.id,
+      params.name,
+      params.description ?? null,
+      params.strategy ?? null,
+      params.apiKeyHash,
+      params.walletAddress,
+      params.proxyWallet,
+      'active',
+      JSON.stringify({ ...DEFAULT_CONFIG }),
+      JSON.stringify(equity),
+      now,
+      1,
+      now,
+      now,
+    );
+
     // No private key stored — external agents sign their own orders.
-    this.agents.set(agent.id, agent);
-    this.apiKeyIndex.set(params.apiKeyHash, agent.id);
-    return agent;
+    return this.get(params.id)!;
   }
 
   count(): number {
-    return this.agents.size;
+    const row = getDb()
+      .prepare('SELECT COUNT(*) as cnt FROM agents')
+      .get() as { cnt: number };
+    return row.cnt;
   }
 }
 

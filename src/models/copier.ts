@@ -1,4 +1,5 @@
 import { decryptSecret, encryptSecret } from '../utils/copier-crypto';
+import { getDb } from '../core/db';
 
 export interface CopierDelegation {
   id: string;
@@ -26,10 +27,35 @@ export interface CopierDelegationPlain {
   updatedAt: number;
 }
 
-class CopierStore {
-  private delegations = new Map<string, CopierDelegation>();
-  private byAgent = new Map<string, string[]>();
+interface CopierRow {
+  id: string;
+  copier_address: string;
+  agent_id: string;
+  fixed_usdc: number;
+  api_key: string;
+  api_secret_enc: string;
+  api_passphrase_enc: string;
+  active: number;
+  created_at: number;
+  updated_at: number;
+}
 
+function rowToModel(row: CopierRow): CopierDelegation {
+  return {
+    id: row.id,
+    copierAddress: row.copier_address,
+    agentId: row.agent_id,
+    fixedUsdc: row.fixed_usdc,
+    apiKey: row.api_key,
+    apiSecretEnc: row.api_secret_enc,
+    apiPassphraseEnc: row.api_passphrase_enc,
+    active: row.active === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+class CopierStore {
   create(params: {
     id: string;
     copierAddress: string;
@@ -41,33 +67,41 @@ class CopierStore {
     active?: boolean;
   }): CopierDelegation {
     const now = Date.now();
-    const d: CopierDelegation = {
-      id: params.id,
-      copierAddress: params.copierAddress,
-      agentId: params.agentId,
-      fixedUsdc: params.fixedUsdc,
-      apiKey: params.apiKey,
-      apiSecretEnc: encryptSecret(params.apiSecret),
-      apiPassphraseEnc: encryptSecret(params.apiPassphrase),
-      active: params.active ?? true,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.delegations.set(d.id, d);
-    const arr = this.byAgent.get(d.agentId) ?? [];
-    arr.push(d.id);
-    this.byAgent.set(d.agentId, arr);
-    return d;
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO copier_delegations
+        (id, copier_address, agent_id, fixed_usdc, api_key, api_secret_enc, api_passphrase_enc, active, created_at, updated_at)
+      VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      params.id,
+      params.copierAddress,
+      params.agentId,
+      params.fixedUsdc,
+      params.apiKey,
+      encryptSecret(params.apiSecret),
+      encryptSecret(params.apiPassphrase),
+      (params.active ?? true) ? 1 : 0,
+      now,
+      now,
+    );
+    return rowToModel(
+      db.prepare('SELECT * FROM copier_delegations WHERE id = ?').get(params.id) as CopierRow,
+    );
   }
 
   listByAgent(agentId: string): CopierDelegation[] {
-    const ids = this.byAgent.get(agentId) ?? [];
-    return ids.map((id) => this.delegations.get(id)).filter(Boolean) as CopierDelegation[];
+    const rows = getDb()
+      .prepare('SELECT * FROM copier_delegations WHERE agent_id = ?')
+      .all(agentId) as CopierRow[];
+    return rows.map(rowToModel);
   }
 
   listActiveByAgent(agentId: string): CopierDelegation[] {
-    return this.listByAgent(agentId).filter((d) => d.active && d.fixedUsdc > 0);
+    const rows = getDb()
+      .prepare('SELECT * FROM copier_delegations WHERE agent_id = ? AND active = 1 AND fixed_usdc > 0')
+      .all(agentId) as CopierRow[];
+    return rows.map(rowToModel);
   }
 
   listActiveByAgentDecrypted(agentId: string): CopierDelegationPlain[] {

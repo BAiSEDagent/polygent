@@ -97,6 +97,29 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_trades_agent ON trades(agent_id);
     CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp);
     CREATE INDEX IF NOT EXISTS idx_agents_api_key ON agents(api_key_hash);
+
+    CREATE TABLE IF NOT EXISTS copier_delegations (
+      id TEXT PRIMARY KEY,
+      copier_address TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      fixed_usdc REAL NOT NULL,
+      api_key TEXT NOT NULL,
+      api_secret_enc TEXT NOT NULL,
+      api_passphrase_enc TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_copier_agent ON copier_delegations(agent_id);
+
+    CREATE TABLE IF NOT EXISTS agent_keys (
+      agent_id TEXT PRIMARY KEY,
+      iv TEXT NOT NULL,
+      tag TEXT NOT NULL,
+      data TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   logger.info('Database migrations applied');
