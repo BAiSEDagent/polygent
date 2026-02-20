@@ -33,7 +33,7 @@ const stageConfig: Record<Stage, { topBorder: string; glow: string }> = {
   },
   'EXECUTING': {
     topBorder: T.color.blue,
-    glow:      `0 0 18px rgba(59,130,246,0.18), 0 -2px 10px rgba(59,130,246,0.25)`,
+    glow:      'none',   // handled by executing-hue-glow CSS animation
   },
   'SETTLED': {
     topBorder: 'rgba(255,255,255,0.05)',
@@ -68,44 +68,45 @@ function TradeCard({ card, showSparkline }: { card: OpCard; showSparkline: boole
 
   return (
     <div
-      className="overflow-hidden transition-colors"
+      className={`overflow-hidden transition-colors ${positive ? 'rail-green' : 'rail-red'}`}
       style={{
-        // Sentiment rail — 2px left accent, instant health read at a glance
+        // Sentiment rail — breathing 2px left accent
         borderLeft:      `2px solid ${sentimentColor}`,
         borderTop:       `1px solid rgba(255,255,255,0.06)`,
         borderRight:     `1px solid rgba(255,255,255,0.06)`,
         borderBottom:    `1px solid rgba(255,255,255,0.06)`,
         borderRadius:    '0 2px 2px 0',
-        backgroundColor: 'rgba(5,5,5,0.85)',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter:  'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         padding:         '8px 10px',
       }}
       onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.04)')}
       onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(5,5,5,0.85)')}
     >
-      {/* Agent ID */}
-      <p className="text-[10px] font-mono" style={{ color: T.text.muted }}>
-        AGENT_ID:{' '}
+      {/* Agent ID — label dimmed, value stars */}
+      <p className="font-mono" style={{ fontSize: '10px' }}>
+        <span style={{ color: T.text.muted, opacity: 0.3 }}>AGENT_ID: </span>
         <span style={{ color: T.color.blue, fontWeight: 600 }}>{card.agentName}</span>
       </p>
 
-      {/* Market */}
-      <p className="text-[11px] font-mono truncate mt-0.5" style={{ color: T.text.secondary }}>
-        MARKET: {card.market}
+      {/* Market — label dimmed */}
+      <p className="font-mono truncate mt-0.5" style={{ fontSize: '10px' }}>
+        <span style={{ color: T.text.muted, opacity: 0.3 }}>MARKET: </span>
+        <span style={{ color: T.text.secondary, fontSize: '11px' }}>{card.market}</span>
       </p>
 
-      {/* SIZE + ROI — Bold Monospace, Electric Blue for dollars */}
+      {/* SIZE + ROI — Bold Monospace, labels dimmed, numbers pop */}
       <div className="flex items-center justify-between mt-1.5">
-        <span className="font-mono text-[11px]" style={{ color: T.text.muted }}>
-          SIZE:{' '}
-          <span style={{ color: T.color.blue, fontWeight: 700 }}>
+        <span className="font-mono" style={{ fontSize: '10px' }}>
+          <span style={{ color: T.text.muted, opacity: 0.3 }}>SIZE: </span>
+          <span style={{ color: T.color.blue, fontWeight: 700, fontSize: '11px' }}>
             ${card.size.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </span>
         </span>
-        <span
-          className="font-bold font-mono text-[11px]"
-          style={{ color: sentimentColor }}
-        >
-          ROI: {positive ? '+' : ''}{card.roi.toFixed(2)}%
+        <span className="font-bold font-mono" style={{ fontSize: '11px', color: sentimentColor }}>
+          <span style={{ opacity: 0.3 }}>ROI: </span>
+          {positive ? '+' : ''}{card.roi.toFixed(2)}%
         </span>
       </div>
 
@@ -148,6 +149,31 @@ export function OpsBoard({ activities }: { activities: any[] }) {
         .polygent-col-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); }
         .polygent-col-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 2px; }
         .polygent-col-scroll::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
+
+        /* Breathing sentiment rails — 3s ease-in-out, not blink */
+        @keyframes rail-breathe-green {
+          0%, 100% { border-left-color: rgba(34,197,94,0.3); box-shadow: -1px 0 6px rgba(34,197,94,0.1); }
+          50%       { border-left-color: rgba(34,197,94,1.0); box-shadow: -1px 0 10px rgba(34,197,94,0.5); }
+        }
+        @keyframes rail-breathe-red {
+          0%, 100% { border-left-color: rgba(239,68,68,0.3); box-shadow: -1px 0 6px rgba(239,68,68,0.1); }
+          50%       { border-left-color: rgba(239,68,68,1.0); box-shadow: -1px 0 10px rgba(239,68,68,0.5); }
+        }
+        .rail-green { animation: rail-breathe-green 3s ease-in-out infinite; }
+        .rail-red   { animation: rail-breathe-red   3s ease-in-out infinite; }
+
+        /* Hue-shift glow — EXECUTING column top border + box-shadow */
+        @keyframes hue-shift-executing {
+          0%, 100% {
+            border-top-color: #3b82f6;
+            box-shadow: 0 0 18px rgba(59,130,246,0.18), 0 -2px 10px rgba(59,130,246,0.25);
+          }
+          50% {
+            border-top-color: #6366f1;
+            box-shadow: 0 0 22px rgba(99,102,241,0.28), 0 -2px 14px rgba(79,70,229,0.4);
+          }
+        }
+        .executing-hue-glow { animation: hue-shift-executing 4s ease-in-out infinite; }
       `}</style>
 
       <section
@@ -182,7 +208,7 @@ export function OpsBoard({ activities }: { activities: any[] }) {
             return (
               <div
                 key={stage}
-                className="rounded-sm p-2.5 polygent-col-scroll"
+                className={`rounded-sm p-2.5 polygent-col-scroll${isExecuting ? ' executing-hue-glow' : ''}`}
                 style={{
                   // Recessed hardware bay — black/20 bg, vertical border-white/5 rails
                   backgroundColor: 'rgba(0,0,0,0.35)',

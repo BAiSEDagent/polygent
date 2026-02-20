@@ -79,8 +79,10 @@ function AgentRow({
         gridTemplateColumns: COLS,
         gap:                 GAP,
         alignItems:          'center',
-        // Semi-transparent rows — blueprint grid bleeds through from page bg
-        backgroundColor:     'rgba(5,5,5,0.8)',
+        // Smoked glass — grid refracts through blurred backdrop
+        backgroundColor:     'rgba(0,0,0,0.6)',
+        backdropFilter:      'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         border:              `1px solid ${T.border.subtle}`,
         // Blueprint grid on EVERY row so it's always visible behind them
         backgroundImage:     T.grid.image,
@@ -190,6 +192,7 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
           gridTemplateColumns: COLS,
           gap:                 GAP,
           color:               T.text.muted,
+          opacity:             0.4,
           fontSize:            '9px',
           letterSpacing:       '0.12em',
         }}
