@@ -1,15 +1,7 @@
-import { ClobClient, Side } from '@polymarket/clob-client';
-import { Wallet } from 'ethers';
+// SECURITY: Option C — orders must be signed client-side. Backend never holds private keys.
+import { v4 as uuid } from 'uuid';
 import { logger } from '../utils/logger';
 import { copierStore } from '../models/copier';
-
-let BuilderConfig: any;
-try {
-  const sdk = require('@polymarket/builder-signing-sdk');
-  BuilderConfig = sdk.BuilderConfig;
-} catch {
-  logger.warn('builder-signing-sdk not installed — copy attribution may fail');
-}
 
 export interface SourceTradeEvent {
   agentId: string;
@@ -18,6 +10,33 @@ export interface SourceTradeEvent {
   outcome: string;
   amount: number;
   price: number;
+}
+
+export interface PendingCopyOrder {
+  id: string;
+  agentId: string;
+  copierId: string;
+  tokenID: string;
+  price: number;
+  size: number;
+  side: string;
+  createdAt: number;
+}
+
+const pendingCopies = new Map<string, PendingCopyOrder>();
+
+export function getPendingCopies(agentId: string): PendingCopyOrder[] {
+  const result: PendingCopyOrder[] = [];
+  for (const order of pendingCopies.values()) {
+    if (order.agentId === agentId) {
+      result.push(order);
+    }
+  }
+  return result;
+}
+
+export function clearPendingCopy(id: string): void {
+  pendingCopies.delete(id);
 }
 
 class CopyEngine {
@@ -33,27 +52,6 @@ class CopyEngine {
       copiers: copiers.length,
     });
 
-    const host = process.env.POLYMARKET_CLOB_URL || 'https://clob.polymarket.com';
-    const chainId = Number(process.env.CHAIN_ID || 137);
-    const builderApiKey = process.env.BUILDER_API_KEY;
-    const builderSecret = process.env.BUILDER_SECRET;
-    const builderPassphrase = process.env.BUILDER_PASSPHRASE;
-
-    if (!builderApiKey || !builderSecret || !builderPassphrase) {
-      logger.error('CopyEngine blocked: missing builder credentials');
-      return;
-    }
-
-    const builderConfig = BuilderConfig
-      ? new BuilderConfig({
-          localBuilderCreds: {
-            key: builderApiKey,
-            secret: builderSecret,
-            passphrase: builderPassphrase,
-          },
-        })
-      : undefined;
-
     for (const copier of copiers) {
       try {
         const usdc = copier.fixedUsdc;
@@ -66,59 +64,33 @@ class CopyEngine {
 
         const sizeShares = usdc / price;
 
-        const creds = {
-          key: copier.apiKey,
-          secret: copier.apiSecret,
-          passphrase: copier.apiPassphrase,
+        // SECURITY: Option C — orders must be signed client-side. Backend never holds private keys.
+        const pending: PendingCopyOrder = {
+          id: uuid(),
+          agentId: trade.agentId,
+          copierId: copier.id,
+          tokenID: trade.marketId,
+          price,
+          size: Number(sizeShares.toFixed(4)),
+          side: trade.side,
+          createdAt: Date.now(),
         };
 
-        // session-key model: no raw private key custody; signer is ephemeral
-        const signer = Wallet.createRandom();
+        pendingCopies.set(pending.id, pending);
 
-        const client = new ClobClient(
-          host,
-          chainId,
-          signer,
-          creds,
-          1,
-          copier.copierAddress,
-          undefined,
-          false,
-          builderConfig
-        );
-
-        const result = await client.createAndPostOrder(
-          {
-            tokenID: trade.marketId,
-            price,
-            size: Number(sizeShares.toFixed(4)),
-            side: trade.side === 'BUY' ? Side.BUY : Side.SELL,
-          },
-          {
-            tickSize: '0.01',
-            negRisk: false,
-          }
-        );
-
-        const orderID = (result as any)?.orderID || (result as any)?.id || (result as any)?.order?.orderID;
-        if (!orderID) {
-          throw new Error(`copy order missing orderID: ${JSON.stringify(result)}`);
-        }
-
-        logger.info('✅ Delegated copy-trade executed', {
+        logger.info('⏳ Copy order queued for client-side signing (Option C)', {
+          pendingCopyId: pending.id,
           copierId: copier.id,
           copierAddress: copier.copierAddress,
           copiedAgentId: trade.agentId,
           fixedUsdc: usdc,
-          marketId: trade.marketId,
+          tokenID: trade.marketId,
           side: trade.side,
           price,
-          sizeShares: Number(sizeShares.toFixed(4)),
-          orderID,
-          attributed: true,
+          sizeShares: pending.size,
         });
       } catch (err) {
-        logger.error('❌ Delegated copy-trade failed', {
+        logger.error('❌ Copy order queuing failed', {
           copierId: copier.id,
           copierAddress: copier.copierAddress,
           error: (err as Error).message,
