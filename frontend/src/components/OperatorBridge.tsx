@@ -14,6 +14,7 @@ declare global {
 
 interface OperatorBridgeProps {
   onConnect?: (address: string) => void;
+  initialAddress?: string; // pre-load from sessionStorage for soft-refresh persistence
 }
 
 // ── State machine ─────────────────────────────────────────────────────────────
@@ -23,13 +24,16 @@ type Phase =
   | 'signing'    // signMessage pending
   | 'booting'    // terminal log sequence
   | 'complete'   // ESTABLISHED — hold 1s
-  | 'fading'     // opacity → 0
+  | 'fading'     // boot sequence opacity → 0
+  | 'linked'     // LIVE — connected operator panel
   | 'denied';    // user rejected wallet or signature
 
-const SIGN_MESSAGE = 'Initialize POLYGENT Operator Link';
-const LINE_DELAY   = 300;   // ms between log lines
-const HOLD_MS      = 1000;  // hold on ESTABLISHED
-const FADE_MS      = 500;   // opacity transition
+const SESSION_KEY   = 'polygent_operator';
+const SIGN_MESSAGE  = 'Initialize POLYGENT Operator Link';
+const LINE_DELAY    = 300;  // ms between log lines
+const HOLD_MS       = 1000; // hold on ESTABLISHED before fade
+const FADE_MS       = 500;  // boot fade out
+const REVEAL_MS     = 350;  // linked panel fade in
 
 interface LogLine {
   body:    string;
@@ -38,7 +42,6 @@ interface LogLine {
   check?:  string;
 }
 
-// Lines 3–6 run after real signature confirmed
 const POST_SIGN_LINES: LogLine[] = [
   { body: ' CREATING SESSION KEY...' },
   { body: ' DELEGATION SCOPE: [BUY, SELL] ', blocks: '████', suffix: ' SET' },
@@ -47,24 +50,36 @@ const POST_SIGN_LINES: LogLine[] = [
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
-  const [watchAddress, setWatchAddress]   = useState('');
-  const [phase,        setPhase]          = useState<Phase>('idle');
-  const [errorMsg,     setErrorMsg]       = useState('');
-  const [walletAddr,   setWalletAddr]     = useState('');
-  const [visibleLines, setVisibleLines]   = useState(0);
-  const [opacity,      setOpacity]        = useState(1);
+export function OperatorBridge({ onConnect, initialAddress }: OperatorBridgeProps) {
+  const [watchAddress, setWatchAddress]     = useState('');
+  const [phase,        setPhase]            = useState<Phase>('idle');
+  const [errorMsg,     setErrorMsg]         = useState('');
+  const [walletAddr,   setWalletAddr]       = useState('');
+  const [visibleLines, setVisibleLines]     = useState(0);
+  const [bootOpacity,  setBootOpacity]      = useState(1); // boot sequence fades out
+  const [linkedOpacity,setLinkedOpacity]    = useState(0); // linked panel fades in
+  const [connectedAt,  setConnectedAt]      = useState<string>('');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
   useEffect(() => () => clearTimers(), []);
+
+  // ── Restore from session on mount ────────────────────────────────────────
+  useEffect(() => {
+    const saved = initialAddress || sessionStorage.getItem(SESSION_KEY);
+    if (saved) {
+      setWalletAddr(saved);
+      setPhase('linked');
+      setLinkedOpacity(1);
+      setConnectedAt(sessionStorage.getItem('polygent_connected_at') || '');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Real EOA connect + sign ──────────────────────────────────────────────
   const handleConnect = async () => {
     if (phase !== 'idle' && phase !== 'denied') return;
     setErrorMsg('');
 
-    // 1. Check MetaMask
     if (!window.ethereum) {
       setPhase('denied');
       setErrorMsg('NO WALLET DETECTED — install MetaMask');
@@ -72,7 +87,6 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
     }
 
     try {
-      // 2. Request accounts — MetaMask account popup
       setPhase('connecting');
       const accounts: string[] = await window.ethereum.request({
         method: 'eth_requestAccounts',
@@ -80,14 +94,15 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
       const address = accounts[0];
       setWalletAddr(address);
 
-      // 3. Sign message — MetaMask sign popup
       setPhase('signing');
       const provider = new ethers.providers.Web3Provider(window.ethereum as any);
       const signer   = provider.getSigner();
       await signer.signMessage(SIGN_MESSAGE);
 
-      // 4. Signature confirmed — start terminal log sequence
+      // Signature confirmed — start terminal log sequence
       setPhase('booting');
+      setBootOpacity(1);
+      setLinkedOpacity(0);
       setVisibleLines(0);
 
       POST_SIGN_LINES.forEach((_, i) => {
@@ -95,17 +110,31 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
         timers.current.push(t);
       });
 
-      // 5. After all lines — hold then fade
       const totalBoot = (POST_SIGN_LINES.length - 1) * LINE_DELAY;
+
+      // Hold on ESTABLISHED
       const holdTimer = setTimeout(() => {
         setPhase('complete');
+
+        // Fade out boot sequence
         const fadeTimer = setTimeout(() => {
           setPhase('fading');
-          setOpacity(0);
-          const resolveTimer = setTimeout(() => {
-            onConnect?.(address);
-          }, FADE_MS + 50);
-          timers.current.push(resolveTimer);
+          setBootOpacity(0);
+
+          // While boot fades, persist and start linked reveal
+          const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+          sessionStorage.setItem(SESSION_KEY, address);
+          sessionStorage.setItem('polygent_connected_at', now);
+          setConnectedAt(now);
+          onConnect?.(address);
+
+          // Linked panel fades in slightly after boot fade begins
+          const revealTimer = setTimeout(() => {
+            setPhase('linked');
+            setLinkedOpacity(1);
+          }, FADE_MS * 0.6); // start revealing before boot fully gone
+          timers.current.push(revealTimer);
+
         }, HOLD_MS);
         timers.current.push(fadeTimer);
       }, totalBoot + LINE_DELAY);
@@ -113,7 +142,6 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
 
     } catch (err: any) {
       clearTimers();
-      // User rejected — revert to AUTH_REQUIRED with error
       const rejected =
         err?.code === 4001 ||
         err?.message?.toLowerCase().includes('reject') ||
@@ -122,18 +150,45 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
       setPhase('denied');
       setErrorMsg(rejected ? 'OPERATOR DENIED LINK — signature rejected' : `ERROR: ${err?.message?.slice(0, 60) ?? 'unknown'}`);
       setVisibleLines(0);
+      setBootOpacity(1);
     }
+  };
+
+  const handleDisconnect = () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('polygent_connected_at');
+    setWalletAddr('');
+    setPhase('idle');
+    setLinkedOpacity(0);
+    setBootOpacity(1);
+    setVisibleLines(0);
+    setConnectedAt('');
   };
 
   const isBooting = phase === 'booting' || phase === 'complete' || phase === 'fading';
 
-  // ── Log lines shown during boot ──────────────────────────────────────────
-  // First two lines are synthetic (happened before boot sequence)
   const displayLines: (LogLine & { synthetic?: boolean })[] = [
     { body: ' CONNECTING TO EOA...',           synthetic: true },
     { body: ' SIGNATURE VERIFIED ', blocks: '████████', suffix: ' OK', synthetic: true },
     ...POST_SIGN_LINES,
   ];
+
+  const shortAddr = walletAddr
+    ? `${walletAddr.slice(0, 6)}…${walletAddr.slice(-4)}`
+    : '';
+
+  // Border color by phase
+  const borderColor = phase === 'denied'
+    ? 'rgba(239,68,68,0.35)'
+    : phase === 'linked'
+    ? 'rgba(34,197,94,0.25)'
+    : 'rgba(139,92,246,0.20)';
+
+  const railGradient = phase === 'denied'
+    ? 'linear-gradient(to right, transparent, rgba(239,68,68,0.6) 50%, transparent)'
+    : phase === 'linked'
+    ? 'linear-gradient(to right, transparent, rgba(34,197,94,0.5) 40%, rgba(59,130,246,0.4) 70%, transparent)'
+    : 'linear-gradient(to right, transparent, rgba(139,92,246,0.7) 40%, rgba(59,130,246,0.5) 70%, transparent)';
 
   return (
     <>
@@ -150,11 +205,23 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
         }
         .dot-pulse { animation: dot-pulse 3s ease-in-out infinite; }
 
+        @keyframes green-pulse {
+          0%, 100% { opacity: 0.60; box-shadow: 0 0 4px rgba(34,197,94,0.5); }
+          50%       { opacity: 1.00; box-shadow: 0 0 12px rgba(34,197,94,0.95), 0 0 24px rgba(34,197,94,0.4); }
+        }
+        .green-pulse { animation: green-pulse 3s ease-in-out infinite; }
+
         @keyframes bridge-breathe {
           0%, 100% { box-shadow: 0 0 40px rgba(139,92,246,0.10), 0 0 80px rgba(139,92,246,0.05), inset 0 0 30px rgba(0,0,0,0.80); }
           50%       { box-shadow: 0 0 60px rgba(139,92,246,0.18), 0 0 100px rgba(139,92,246,0.09), inset 0 0 30px rgba(0,0,0,0.80); }
         }
         .bridge-module { animation: bridge-breathe 4s ease-in-out infinite; }
+
+        @keyframes linked-breathe {
+          0%, 100% { box-shadow: 0 0 30px rgba(34,197,94,0.08), 0 0 60px rgba(34,197,94,0.04), inset 0 0 30px rgba(0,0,0,0.80); }
+          50%       { box-shadow: 0 0 50px rgba(34,197,94,0.14), 0 0 80px rgba(34,197,94,0.07), inset 0 0 30px rgba(0,0,0,0.80); }
+        }
+        .linked-module { animation: linked-breathe 4s ease-in-out infinite; }
 
         @keyframes line-entry {
           from { opacity: 0; transform: translateY(4px); }
@@ -168,34 +235,43 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
           0%, 100% { opacity: 0.7; } 50% { opacity: 1; }
         }
         .error-blink { animation: error-pulse 1.2s ease-in-out infinite; }
+
+        @keyframes linked-row-in {
+          from { opacity: 0; transform: translateX(-4px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        .linked-row { animation: linked-row-in 0.22s ease-out forwards; }
+        .linked-row:nth-child(1) { animation-delay: 0.00s; }
+        .linked-row:nth-child(2) { animation-delay: 0.06s; }
+        .linked-row:nth-child(3) { animation-delay: 0.12s; }
+        .linked-row:nth-child(4) { animation-delay: 0.18s; }
       `}</style>
 
       <div
-        className="bridge-module rounded-sm"
+        className={phase === 'linked' ? 'linked-module rounded-sm' : 'bridge-module rounded-sm'}
         style={{
           backgroundColor:      '#050505',
           backdropFilter:       'blur(25px)',
           WebkitBackdropFilter: 'blur(25px)',
-          border:               `1px solid ${phase === 'denied' ? 'rgba(239,68,68,0.35)' : 'rgba(139,92,246,0.20)'}`,
+          border:               `1px solid ${borderColor}`,
           display:              'flex',
           flexDirection:        'column',
           overflow:             'hidden',
-          opacity,
-          transition:           `opacity ${FADE_MS}ms ease`,
+          transition:           `border-color 0.6s ease`,
+          position:             'relative',
         }}
       >
         {/* Power rail */}
         <div style={{
           height:     '1px',
-          background: phase === 'denied'
-            ? 'linear-gradient(to right, transparent, rgba(239,68,68,0.6) 50%, transparent)'
-            : 'linear-gradient(to right, transparent, rgba(139,92,246,0.7) 40%, rgba(59,130,246,0.5) 70%, transparent)',
+          background: railGradient,
+          transition: 'background 0.6s ease',
         }} />
 
-        <div style={{ padding: '20px 18px 22px' }}>
+        <div style={{ padding: '20px 18px 22px', position: 'relative' }}>
 
-          {/* ── IDLE / DENIED — auth gate ──────────────────────────────── */}
-          {!isBooting && (
+          {/* ── IDLE / DENIED — auth gate ─────────────────────────────── */}
+          {!isBooting && phase !== 'linked' && (
             <>
               <div style={{ marginBottom: '10px' }}>
                 <div className="font-bold font-mono flex items-center gap-1"
@@ -207,7 +283,6 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                   )}
                 </div>
 
-                {/* Error message */}
                 {phase === 'denied' && errorMsg && (
                   <div className="error-blink font-mono" style={{
                     fontSize: '10px', color: T.color.red,
@@ -228,7 +303,6 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
 
               <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '14px 0' }} />
 
-              {/* CONNECT OPERATOR button */}
               <button
                 onClick={handleConnect}
                 disabled={phase === 'connecting' || phase === 'signing'}
@@ -263,8 +337,8 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                 }}
               >
                 {phase === 'connecting' ? 'OPENING WALLET...'
-                  : phase === 'signing'    ? 'AWAITING SIGNATURE...'
-                  : phase === 'denied'     ? 'RETRY CONNECTION'
+                  : phase === 'signing' ? 'AWAITING SIGNATURE...'
+                  : phase === 'denied'  ? 'RETRY CONNECTION'
                   : 'CONNECT OPERATOR'}
               </button>
 
@@ -305,7 +379,6 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                 />
               </div>
 
-              {/* Status dot */}
               <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.35 }}>
                 <div className="dot-pulse" style={{
                   width: '5px', height: '5px', borderRadius: '50%',
@@ -318,9 +391,19 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
             </>
           )}
 
-          {/* ── BOOT SEQUENCE — runs after real signature confirmed ────── */}
+          {/* ── BOOT SEQUENCE ─────────────────────────────────────────── */}
           {isBooting && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '160px' }}>
+            <div style={{
+              display:    'flex',
+              flexDirection: 'column',
+              gap:        '8px',
+              minHeight:  '160px',
+              opacity:    bootOpacity,
+              transition: `opacity ${FADE_MS}ms ease`,
+              // Keep in layout during fade so linked panel can overlap-swap
+              position:   phase === 'fading' ? 'absolute' : 'relative',
+              inset:      phase === 'fading' ? '20px 18px' : undefined,
+            }}>
               <div className="font-bold font-mono flex items-center gap-1" style={{
                 fontSize: '13px', color: '#f4f4f5', letterSpacing: '0.06em', marginBottom: '6px',
               }}>
@@ -328,7 +411,6 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                 <span> INITIALIZING...</span>
               </div>
 
-              {/* All lines (first 2 synthetic, rest from POST_SIGN_LINES) */}
               {displayLines.slice(0, visibleLines + 2).map((line, i) => {
                 const isLastLine = i === displayLines.length - 1;
                 const isResolved = phase === 'complete' || phase === 'fading';
@@ -366,9 +448,132 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                   letterSpacing: '0.14em', color: T.color.green, opacity: 0.7,
                   textShadow: '0 0 10px rgba(34,197,94,0.5)',
                 }}>
-                  ● OPERATOR LINK ACTIVE — {walletAddr.slice(0,6)}…{walletAddr.slice(-4)}
+                  ● OPERATOR LINK ACTIVE — {shortAddr}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── LINKED — persistent connected panel ───────────────────── */}
+          {phase === 'linked' && (
+            <div style={{
+              opacity:    linkedOpacity,
+              transition: `opacity ${REVEAL_MS}ms ease`,
+              display:    'flex',
+              flexDirection: 'column',
+              gap:        '12px',
+            }}>
+              {/* Header row */}
+              <div className="linked-row font-bold font-mono flex items-center justify-between"
+                style={{ fontSize: '13px', color: '#f4f4f5', letterSpacing: '0.06em' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="green-pulse" style={{
+                    width: '6px', height: '6px', borderRadius: '50%',
+                    backgroundColor: T.color.green, flexShrink: 0,
+                  }} />
+                  <span style={{ color: T.color.green }}>OPERATOR LINKED</span>
+                </div>
+                {/* Disconnect */}
+                <button
+                  onClick={handleDisconnect}
+                  className="font-mono"
+                  style={{
+                    background: 'none', border: 'none',
+                    color: 'rgba(239,68,68,0.50)', fontSize: '8px',
+                    letterSpacing: '0.12em', cursor: 'pointer',
+                    padding: '2px 4px',
+                    transition: 'color 0.15s ease',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = T.color.red; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'rgba(239,68,68,0.50)'; }}
+                >
+                  DISCONNECT
+                </button>
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: 'rgba(34,197,94,0.10)' }} />
+
+              {/* Address pill */}
+              <div className="linked-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="font-mono" style={{ fontSize: '9px', color: T.text.muted, opacity: 0.5, letterSpacing: '0.10em' }}>
+                  EOA
+                </span>
+                <div style={{
+                  backgroundColor: 'rgba(34,197,94,0.08)',
+                  border:          '1px solid rgba(34,197,94,0.20)',
+                  borderRadius:    '3px',
+                  padding:         '4px 10px',
+                  display:         'flex',
+                  alignItems:      'center',
+                  gap:             '6px',
+                }}>
+                  <div style={{
+                    width: '4px', height: '4px', borderRadius: '50%',
+                    backgroundColor: T.color.green,
+                    boxShadow: '0 0 6px rgba(34,197,94,0.8)',
+                  }} />
+                  <span className="font-mono font-bold" style={{
+                    fontSize: '11px', color: T.color.green,
+                    letterSpacing: '0.08em',
+                    textShadow: '0 0 8px rgba(34,197,94,0.4)',
+                  }}>
+                    {shortAddr}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status rows */}
+              <div className="linked-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {[
+                  { label: 'COPY ENGINE',   value: 'ARMED',    valueColor: T.color.green },
+                  { label: 'DELEGATION',    value: '[BUY, SELL]', valueColor: T.color.blue },
+                  { label: 'SESSION',       value: connectedAt ? `SINCE ${connectedAt}` : 'ACTIVE', valueColor: 'rgba(255,255,255,0.55)' },
+                ].map(row => (
+                  <div key={row.label} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span className="font-mono" style={{
+                      fontSize: '9px', color: T.text.muted, opacity: 0.45, letterSpacing: '0.10em',
+                    }}>
+                      {row.label}
+                    </span>
+                    <span className="font-mono font-bold" style={{
+                      fontSize: '9px', color: row.valueColor, letterSpacing: '0.10em',
+                    }}>
+                      {row.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.04)' }} />
+
+              {/* CTA */}
+              <div className="linked-row">
+                <button
+                  className="connect-btn w-full font-bold font-mono rounded-sm"
+                  style={{
+                    backgroundColor: 'rgba(34,197,94,0.12)',
+                    color:           T.color.green,
+                    fontSize:        '12px',
+                    letterSpacing:   '0.12em',
+                    padding:         '10px 16px',
+                    border:          '1px solid rgba(34,197,94,0.30)',
+                    boxShadow:       '0 0 12px rgba(34,197,94,0.15), inset 0 0 4px rgba(34,197,94,0.08)',
+                    cursor:          'pointer',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(34,197,94,0.20)';
+                    e.currentTarget.style.boxShadow = '0 0 20px rgba(34,197,94,0.30), inset 0 0 8px rgba(34,197,94,0.10)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(34,197,94,0.12)';
+                    e.currentTarget.style.boxShadow = '0 0 12px rgba(34,197,94,0.15), inset 0 0 4px rgba(34,197,94,0.08)';
+                  }}
+                >
+                  COPY STRATEGY →
+                </button>
+              </div>
             </div>
           )}
 

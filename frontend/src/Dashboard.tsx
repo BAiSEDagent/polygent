@@ -10,11 +10,15 @@ import { Leaderboard } from './components/Leaderboard';
 import { AgentProfile } from './components/AgentProfile';
 import { OperatorBridge } from './components/OperatorBridge';
 
+const SESSION_KEY = 'polygent_operator';
+
 export function Dashboard() {
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
-  const [bridgeVisible, setBridgeVisible] = useState(true);
-  const [gridFlash,     setGridFlash]     = useState(false);  // 0.8s blue pulse
-  const [voidScan,      setVoidScan]      = useState(false);  // 3s placeholder scan
+  const [gridFlash,     setGridFlash]     = useState(false);
+  // Seed initialAddress from sessionStorage — OperatorBridge handles its own linked state
+  const [initialAddress] = useState<string>(() =>
+    sessionStorage.getItem(SESSION_KEY) ?? ''
+  );
 
   const healthFetch = useCallback(() => api.getHealth(), []);
   const lbFetch     = useCallback(() => api.getLeaderboard(), []);
@@ -28,11 +32,10 @@ export function Dashboard() {
   const realActivities = actData?.activity   ?? [];
   const activities     = useSimulation(realActivities, true);
 
+  // Called by OperatorBridge when EOA link is established
   const handleOperatorConnected = (_address: string) => {
-    setBridgeVisible(false);
-    // Trigger global Electric Blue grid pulse
+    // Fire Electric Blue grid pulse
     setGridFlash(true);
-    setVoidScan(true);
   };
 
   // Auto-clear flash after 800ms
@@ -41,13 +44,6 @@ export function Dashboard() {
     const t = setTimeout(() => setGridFlash(false), 800);
     return () => clearTimeout(t);
   }, [gridFlash]);
-
-  // Auto-clear void scan after 3000ms
-  useEffect(() => {
-    if (!voidScan) return;
-    const t = setTimeout(() => setVoidScan(false), 3000);
-    return () => clearTimeout(t);
-  }, [voidScan]);
 
   return (
     <>
@@ -61,27 +57,6 @@ export function Dashboard() {
         }
         .grid-flash-overlay {
           animation: grid-pulse-flash 0.8s ease-out forwards;
-        }
-
-        /* Void scan line — placeholder after bridge dismisses, 3s single pass */
-        @keyframes void-scan-line {
-          0%   { top: -2px; opacity: 0; }
-          5%   { opacity: 0.55; }
-          92%  { opacity: 0.55; }
-          100% { top: 100%; opacity: 0; }
-        }
-        .void-scan-line {
-          position: absolute;
-          left: 0; right: 0; height: 1px;
-          background: linear-gradient(
-            to right,
-            transparent 0%,
-            rgba(59,130,246,0.5) 30%,
-            rgba(59,130,246,0.5) 70%,
-            transparent 100%
-          );
-          animation: void-scan-line 3s linear forwards;
-          pointer-events: none;
         }
       `}</style>
 
@@ -138,23 +113,16 @@ export function Dashboard() {
 
             <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
 
-            {/* ROW 1, COL 2 — Bridge or void */}
-            {bridgeVisible
-              ? <OperatorBridge onConnect={handleOperatorConnected} />
-              : (
-                  // Void placeholder — maintains grid slot, shows power-up scan for 3s
-                  <div style={{
-                    position: 'relative',
-                    overflow: 'hidden',
-                    // Faint border so the slot isn't completely invisible
-                    border:          'none',
-                    backgroundColor: 'transparent',
-                    minHeight:       '20px',
-                  }}>
-                    {voidScan && <div className="void-scan-line" />}
-                  </div>
-                )
-            }
+            {/*
+              ROW 1, COL 2 — OperatorBridge is ALWAYS mounted.
+              It manages its own phases internally (idle → linking → linked).
+              initialAddress restores persisted session from sessionStorage.
+              Never conditionally unmount this — that's what caused the blank box.
+            */}
+            <OperatorBridge
+              onConnect={handleOperatorConnected}
+              initialAddress={initialAddress}
+            />
 
             <OpsBoard activities={activities} />
 
