@@ -39,41 +39,72 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
     return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   };
 
+  const pnlPositive = stats.pnl >= 0;
+  const pnlColor    = pnlPositive ? T.color.green : T.color.red;
+
   const cells = [
-    { label: 'NETWORK VOL',   value: fmt(stats.volume),       color: T.text.primary },
-    { label: 'ACTIVE AGENTS', value: String(stats.agents),    color: T.color.blue   },
-    { label: '24H TRADES',    value: String(stats.trades24h), color: T.text.primary },
+    { label: 'NETWORK VOL',   value: fmt(stats.volume),       color: T.text.primary, glow: false },
+    { label: 'ACTIVE AGENTS', value: String(stats.agents),    color: T.color.blue,   glow: false },
+    { label: '24H TRADES',    value: String(stats.trades24h), color: T.text.primary, glow: false },
     {
       label: 'GLOBAL PNL',
-      value: `${stats.pnl >= 0 ? '+' : ''}${stats.pnl.toFixed(2)}%`,
-      // Same vibrant green as the LED badges — visual continuity
-      color: stats.pnl >= 0 ? T.color.green : T.color.red,
+      value: `${pnlPositive ? '+' : ''}${stats.pnl.toFixed(2)}%`,
+      color: pnlColor,
+      glow:  true,   // this value casts ambient light downward
     },
   ];
 
   return (
+    // Etched header — no box borders, single bottom divider, P&L glow spills down
     <div
-      className="grid grid-cols-4 rounded-sm"
       style={{
-        border: `1px solid ${T.border.DEFAULT}`,
-        backgroundColor: 'rgba(15,15,16,0.5)',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        borderBottom: '1px solid rgba(255,255,255,0.10)',
+        paddingBottom: '16px',
+        // P&L ambient glow spills downward into the Ops Board below
+        boxShadow: pnlPositive
+          ? '0 12px 40px rgba(34,197,94,0.08), 0 6px 16px rgba(34,197,94,0.05)'
+          : '0 12px 40px rgba(239,68,68,0.06)',
       }}
     >
       {cells.map((c, i) => (
         <div
           key={i}
-          className="px-6 py-4 text-center"
-          style={i > 0 ? { borderLeft: `1px solid ${T.border.DEFAULT}` } : {}}
+          className="text-center"
+          style={{
+            padding: '12px 16px',
+            // Thin separator between cells (no border on first)
+            borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+          }}
         >
+          {/* Label — dimmed, all-caps monospace */}
           <div
-            className="text-[10px] uppercase font-mono mb-1.5"
-            style={{ color: T.text.muted, letterSpacing: '0.15em' }}
+            className="font-mono uppercase"
+            style={{
+              color:         T.text.muted,
+              opacity:       0.5,
+              fontSize:      '9px',
+              letterSpacing: '0.18em',
+              marginBottom:  '6px',
+            }}
           >
             {c.label}
           </div>
+
+          {/* Value — large bold mono, P&L gets text glow */}
           <div
-            className="text-3xl font-bold font-mono tracking-tight"
-            style={{ color: c.color }}
+            className="font-bold font-mono tracking-tight"
+            style={{
+              fontSize:   '2.25rem',
+              color:      c.color,
+              lineHeight: 1,
+              textShadow: c.glow
+                ? pnlPositive
+                  ? '0 0 20px rgba(34,197,94,0.7), 0 0 50px rgba(34,197,94,0.25)'
+                  : '0 0 20px rgba(239,68,68,0.6), 0 0 40px rgba(239,68,68,0.2)'
+                : 'none',
+            }}
           >
             {c.value}
           </div>

@@ -25,7 +25,6 @@ export function Dashboard() {
   const activities     = useSimulation(realActivities, true);
 
   return (
-    // Global blueprint grid across the entire page background
     <div
       className="min-h-screen font-mono"
       style={{
@@ -43,17 +42,39 @@ export function Dashboard() {
         agents={health?.agents ?? 0}
       />
 
-      <main className="p-4 lg:p-5 space-y-4">
+      <main className="p-4 lg:p-6" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* ── ETCHED STAT HEADER ─────────────────────────────────────────── */}
         <MissionControl activities={activities} agents={health?.agents ?? 0} />
 
-        <div className="grid grid-cols-1 xl:grid-cols-[2.2fr_1fr] gap-4 items-start">
-          {/* Left column — scrolls with page */}
-          <div className="space-y-4">
-            <OpsBoard activities={activities} />
+        {/* ── COCKPIT — three-column bracket layout ──────────────────────── */}
+        <div
+          style={{
+            display: 'grid',
+            // [Left rail: Leaderboard] [Center: Ops Board] [Right rail: Intel Feed]
+            gridTemplateColumns: '280px 1fr 300px',
+            gap: '16px',
+            alignItems: 'start',
+          }}
+        >
+          {/* LEFT RAIL — Leaderboard, sticky, smoked glass */}
+          <div
+            className="xl:sticky"
+            style={{
+              top: '8px',
+              maxHeight: 'calc(100vh - 140px)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
             <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
           </div>
 
-          {/* Right column — Intel Feed, independently scrollable */}
+          {/* CENTER — Live Operations Board, expands to fill */}
+          <OpsBoard activities={activities} />
+
+          {/* RIGHT RAIL — Intel Feed, sticky */}
           <div
             className="xl:sticky"
             style={{ top: '8px' }}
