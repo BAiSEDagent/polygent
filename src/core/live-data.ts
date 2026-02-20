@@ -57,6 +57,7 @@ class LiveDataService extends EventEmitter {
   private wsSubscriptions = new Set<string>();
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private reconnectAttempts = 0;
 
@@ -267,6 +268,16 @@ class LiveDataService extends EventEmitter {
       this.wsConnection.on('open', () => {
         logger.info('🔌 CLOB WebSocket connected');
         this.reconnectAttempts = 0; // Reset on successful connection
+
+        // Keepalive: Polymarket CLOB drops idle connections after ~2min.
+        // Send a ping every 90s to hold the connection open.
+        if (this.pingInterval) clearInterval(this.pingInterval);
+        this.pingInterval = setInterval(() => {
+          if (this.wsConnection?.readyState === WebSocket.OPEN) {
+            this.wsConnection.ping();
+          }
+        }, 90_000);
+
         // Re-subscribe to all tracked tokens
         if (this.wsSubscriptions.size > 0) {
           this.sendWsSubscribe(Array.from(this.wsSubscriptions));
@@ -284,11 +295,13 @@ class LiveDataService extends EventEmitter {
 
       this.wsConnection.on('close', () => {
         logger.info('CLOB WebSocket disconnected');
+        if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null; }
         this.scheduleReconnect();
       });
 
       this.wsConnection.on('error', (err) => {
         logger.debug('CLOB WebSocket error', { error: err.message });
+        if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null; }
         this.wsConnection?.close();
       });
     } catch (error) {

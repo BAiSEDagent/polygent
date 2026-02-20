@@ -42,14 +42,16 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin: string | undefined, callback) => {
-    // Allow requests with no origin (curl, server-to-server) ONLY in dev
+    // Allow requests with no origin (curl, health checks, server-to-server)
     if (!origin) {
-      return callback(null, config.NODE_ENV === 'development');
+      return callback(null, true);
     }
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // Return false (403) instead of throwing — avoids "Unhandled error" log spam
+      logger.debug('CORS blocked origin', { origin });
+      callback(null, false);
     }
   },
   credentials: true,
