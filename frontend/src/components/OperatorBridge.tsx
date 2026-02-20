@@ -1,72 +1,139 @@
 import { useState, useEffect, useRef } from 'react';
+import { ethers } from 'ethers';
 import { INDUSTRIAL_THEME as T } from '../lib/theme';
 
-interface OperatorBridgeProps {
-  onConnect?: () => void;
+// ── Window.ethereum type augmentation ────────────────────────────────────────
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string; params?: any[] }) => Promise<any>;
+      isMetaMask?: boolean;
+    };
+  }
 }
 
-type Phase = 'idle' | 'booting' | 'complete' | 'fading';
+interface OperatorBridgeProps {
+  onConnect?: (address: string) => void;
+}
+
+// ── State machine ─────────────────────────────────────────────────────────────
+type Phase =
+  | 'idle'       // default — show CONNECT button
+  | 'connecting' // eth_requestAccounts pending
+  | 'signing'    // signMessage pending
+  | 'booting'    // terminal log sequence
+  | 'complete'   // ESTABLISHED — hold 1s
+  | 'fading'     // opacity → 0
+  | 'denied';    // user rejected wallet or signature
+
+const SIGN_MESSAGE = 'Initialize POLYGENT Operator Link';
+const LINE_DELAY   = 300;   // ms between log lines
+const HOLD_MS      = 1000;  // hold on ESTABLISHED
+const FADE_MS      = 500;   // opacity transition
 
 interface LogLine {
-  prefix:  string;
   body:    string;
   blocks?: string;
   suffix?: string;
   check?:  string;
 }
 
-const BOOT_SEQUENCE: LogLine[] = [
-  { prefix: '>', body: ' CONNECTING TO EOA...' },
-  { prefix: '>', body: ' SIGNATURE VERIFIED ', blocks: '████████', suffix: ' OK' },
-  { prefix: '>', body: ' CREATING SESSION KEY...' },
-  { prefix: '>', body: ' DELEGATION SCOPE: [BUY, SELL] ', blocks: '████', suffix: ' SET' },
-  { prefix: '>', body: ' COPY ENGINE: ARMED' },
-  { prefix: '>', body: ' OPERATOR LINK: ESTABLISHED ', check: ' ✓' },
+// Lines 3–6 run after real signature confirmed
+const POST_SIGN_LINES: LogLine[] = [
+  { body: ' CREATING SESSION KEY...' },
+  { body: ' DELEGATION SCOPE: [BUY, SELL] ', blocks: '████', suffix: ' SET' },
+  { body: ' COPY ENGINE: ARMED' },
+  { body: ' OPERATOR LINK: ESTABLISHED', check: ' ✓' },
 ];
 
-const LINE_DELAY_MS  = 300;  // stagger between lines
-const HOLD_MS        = 1000; // hold on ESTABLISHED before fade
-const FADE_MS        = 500;  // opacity transition duration
-
+// ── Component ─────────────────────────────────────────────────────────────────
 export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
-  const [watchAddress, setWatchAddress] = useState('');
-  const [phase, setPhase]               = useState<Phase>('idle');
-  const [visibleLines, setVisibleLines] = useState(0);
-  const [opacity, setOpacity]           = useState(1);
+  const [watchAddress, setWatchAddress]   = useState('');
+  const [phase,        setPhase]          = useState<Phase>('idle');
+  const [errorMsg,     setErrorMsg]       = useState('');
+  const [walletAddr,   setWalletAddr]     = useState('');
+  const [visibleLines, setVisibleLines]   = useState(0);
+  const [opacity,      setOpacity]        = useState(1);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
-
-  const handleConnect = () => {
-    if (phase !== 'idle') return;
-    setPhase('booting');
-
-    // Reveal each line with staggered delay
-    BOOT_SEQUENCE.forEach((_, i) => {
-      const t = setTimeout(() => setVisibleLines(i + 1), i * LINE_DELAY_MS);
-      timers.current.push(t);
-    });
-
-    // After all lines visible → hold → fade
-    const totalBoot = (BOOT_SEQUENCE.length - 1) * LINE_DELAY_MS;
-    const holdTimer = setTimeout(() => {
-      setPhase('complete');
-      const fadeTimer = setTimeout(() => {
-        setPhase('fading');
-        setOpacity(0);
-        // After fade transition completes, fire onConnect
-        const resolveTimer = setTimeout(() => { onConnect?.(); }, FADE_MS + 50);
-        timers.current.push(resolveTimer);
-      }, HOLD_MS);
-      timers.current.push(fadeTimer);
-    }, totalBoot + LINE_DELAY_MS);
-    timers.current.push(holdTimer);
-  };
-
-  // Cleanup on unmount
   useEffect(() => () => clearTimers(), []);
 
+  // ── Real EOA connect + sign ──────────────────────────────────────────────
+  const handleConnect = async () => {
+    if (phase !== 'idle' && phase !== 'denied') return;
+    setErrorMsg('');
+
+    // 1. Check MetaMask
+    if (!window.ethereum) {
+      setPhase('denied');
+      setErrorMsg('NO WALLET DETECTED — install MetaMask');
+      return;
+    }
+
+    try {
+      // 2. Request accounts — MetaMask account popup
+      setPhase('connecting');
+      const accounts: string[] = await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+      const address = accounts[0];
+      setWalletAddr(address);
+
+      // 3. Sign message — MetaMask sign popup
+      setPhase('signing');
+      const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+      const signer   = provider.getSigner();
+      await signer.signMessage(SIGN_MESSAGE);
+
+      // 4. Signature confirmed — start terminal log sequence
+      setPhase('booting');
+      setVisibleLines(0);
+
+      POST_SIGN_LINES.forEach((_, i) => {
+        const t = setTimeout(() => setVisibleLines(i + 1), i * LINE_DELAY);
+        timers.current.push(t);
+      });
+
+      // 5. After all lines — hold then fade
+      const totalBoot = (POST_SIGN_LINES.length - 1) * LINE_DELAY;
+      const holdTimer = setTimeout(() => {
+        setPhase('complete');
+        const fadeTimer = setTimeout(() => {
+          setPhase('fading');
+          setOpacity(0);
+          const resolveTimer = setTimeout(() => {
+            onConnect?.(address);
+          }, FADE_MS + 50);
+          timers.current.push(resolveTimer);
+        }, HOLD_MS);
+        timers.current.push(fadeTimer);
+      }, totalBoot + LINE_DELAY);
+      timers.current.push(holdTimer);
+
+    } catch (err: any) {
+      clearTimers();
+      // User rejected — revert to AUTH_REQUIRED with error
+      const rejected =
+        err?.code === 4001 ||
+        err?.message?.toLowerCase().includes('reject') ||
+        err?.message?.toLowerCase().includes('denied') ||
+        err?.message?.toLowerCase().includes('user denied');
+      setPhase('denied');
+      setErrorMsg(rejected ? 'OPERATOR DENIED LINK — signature rejected' : `ERROR: ${err?.message?.slice(0, 60) ?? 'unknown'}`);
+      setVisibleLines(0);
+    }
+  };
+
   const isBooting = phase === 'booting' || phase === 'complete' || phase === 'fading';
+
+  // ── Log lines shown during boot ──────────────────────────────────────────
+  // First two lines are synthetic (happened before boot sequence)
+  const displayLines: (LogLine & { synthetic?: boolean })[] = [
+    { body: ' CONNECTING TO EOA...',           synthetic: true },
+    { body: ' SIGNATURE VERIFIED ', blocks: '████████', suffix: ' OK', synthetic: true },
+    ...POST_SIGN_LINES,
+  ];
 
   return (
     <>
@@ -89,7 +156,6 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
         }
         .bridge-module { animation: bridge-breathe 4s ease-in-out infinite; }
 
-        /* Line entry — slides up + fades in */
         @keyframes line-entry {
           from { opacity: 0; transform: translateY(4px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -97,6 +163,11 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
         .boot-line { animation: line-entry 0.18s ease-out forwards; }
 
         .connect-btn { transition: background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+
+        @keyframes error-pulse {
+          0%, 100% { opacity: 0.7; } 50% { opacity: 1; }
+        }
+        .error-blink { animation: error-pulse 1.2s ease-in-out infinite; }
       `}</style>
 
       <div
@@ -105,33 +176,47 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
           backgroundColor:      '#050505',
           backdropFilter:       'blur(25px)',
           WebkitBackdropFilter: 'blur(25px)',
-          border:               '1px solid rgba(139,92,246,0.20)',
+          border:               `1px solid ${phase === 'denied' ? 'rgba(239,68,68,0.35)' : 'rgba(139,92,246,0.20)'}`,
           display:              'flex',
           flexDirection:        'column',
           overflow:             'hidden',
-          // Fade-out transition — opacity controlled by state
-          opacity:    opacity,
-          transition: `opacity ${FADE_MS}ms ease`,
+          opacity,
+          transition:           `opacity ${FADE_MS}ms ease`,
         }}
       >
         {/* Power rail */}
         <div style={{
           height:     '1px',
-          background: 'linear-gradient(to right, transparent, rgba(139,92,246,0.7) 40%, rgba(59,130,246,0.5) 70%, transparent)',
+          background: phase === 'denied'
+            ? 'linear-gradient(to right, transparent, rgba(239,68,68,0.6) 50%, transparent)'
+            : 'linear-gradient(to right, transparent, rgba(139,92,246,0.7) 40%, rgba(59,130,246,0.5) 70%, transparent)',
         }} />
 
         <div style={{ padding: '20px 18px 22px' }}>
 
-          {/* ── IDLE STATE — normal auth content ──────────────────────── */}
+          {/* ── IDLE / DENIED — auth gate ──────────────────────────────── */}
           {!isBooting && (
             <>
               <div style={{ marginBottom: '10px' }}>
                 <div className="font-bold font-mono flex items-center gap-1"
                   style={{ fontSize: '13px', color: '#f4f4f5', letterSpacing: '0.06em' }}>
-                  <span style={{ color: 'rgba(139,92,246,0.8)' }}>&gt;_</span>
-                  <span> AUTH_REQUIRED</span>
-                  <span className="auth-cursor" style={{ color: 'rgba(139,92,246,0.9)', marginLeft: '2px' }}>▋</span>
+                  <span style={{ color: phase === 'denied' ? 'rgba(239,68,68,0.8)' : 'rgba(139,92,246,0.8)' }}>&gt;_</span>
+                  <span> {phase === 'denied' ? 'AUTH_FAILED' : 'AUTH_REQUIRED'}</span>
+                  {phase !== 'denied' && (
+                    <span className="auth-cursor" style={{ color: 'rgba(139,92,246,0.9)', marginLeft: '2px' }}>▋</span>
+                  )}
                 </div>
+
+                {/* Error message */}
+                {phase === 'denied' && errorMsg && (
+                  <div className="error-blink font-mono" style={{
+                    fontSize: '10px', color: T.color.red,
+                    marginTop: '6px', letterSpacing: '0.04em',
+                  }}>
+                    ✗ {errorMsg}
+                  </div>
+                )}
+
                 <p className="font-mono" style={{
                   fontSize: '10px', lineHeight: 1.5,
                   color: T.text.muted, opacity: 0.30,
@@ -143,54 +228,53 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
 
               <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '14px 0' }} />
 
+              {/* CONNECT OPERATOR button */}
               <button
                 onClick={handleConnect}
+                disabled={phase === 'connecting' || phase === 'signing'}
                 className="connect-btn w-full font-bold font-mono rounded-sm"
                 style={{
-                  backgroundColor: T.color.blue,
-                  color:           '#000000',
+                  backgroundColor: phase === 'denied' ? 'rgba(239,68,68,0.15)' : T.color.blue,
+                  color:           phase === 'denied' ? T.color.red : '#000000',
                   fontSize:        '12px',
                   letterSpacing:   '0.12em',
                   padding:         '11px 16px',
-                  border:          '1px solid rgba(255,255,255,0.40)',
-                  boxShadow:
-                    '0 0 15px rgba(59,130,246,0.60), ' +
-                    '0 0 30px rgba(59,130,246,0.25), ' +
-                    'inset 0 0 5px rgba(255,255,255,0.30), ' +
-                    'inset 0 1px 0 rgba(255,255,255,0.40)',
+                  border:          phase === 'denied'
+                    ? '1px solid rgba(239,68,68,0.50)'
+                    : '1px solid rgba(255,255,255,0.40)',
+                  boxShadow: phase === 'denied'
+                    ? '0 0 10px rgba(239,68,68,0.25)'
+                    : '0 0 15px rgba(59,130,246,0.60), 0 0 30px rgba(59,130,246,0.25), inset 0 0 5px rgba(255,255,255,0.30), inset 0 1px 0 rgba(255,255,255,0.40)',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={e => {
+                  if (phase === 'denied') return;
                   e.currentTarget.style.backgroundColor = '#5b9eff';
                   e.currentTarget.style.borderColor     = 'rgba(255,255,255,0.70)';
                   e.currentTarget.style.boxShadow =
-                    '0 0 4px  rgba(255,255,255,0.90), ' +
-                    '0 0 8px  rgba(59,130,246,1.00), '  +
-                    '0 0 15px rgba(59,130,246,0.95), '  +
-                    '0 0 28px rgba(59,130,246,0.30), '  +
-                    'inset 0 0 10px rgba(255,255,255,0.40), ' +
-                    'inset 0 1px 0  rgba(255,255,255,0.70)';
+                    '0 0 4px rgba(255,255,255,0.90), 0 0 8px rgba(59,130,246,1.00), 0 0 15px rgba(59,130,246,0.95), 0 0 28px rgba(59,130,246,0.30), inset 0 0 10px rgba(255,255,255,0.40), inset 0 1px 0 rgba(255,255,255,0.70)';
                 }}
                 onMouseLeave={e => {
+                  if (phase === 'denied') return;
                   e.currentTarget.style.backgroundColor = T.color.blue;
                   e.currentTarget.style.borderColor     = 'rgba(255,255,255,0.40)';
                   e.currentTarget.style.boxShadow =
-                    '0 0 15px rgba(59,130,246,0.60), ' +
-                    '0 0 30px rgba(59,130,246,0.25), ' +
-                    'inset 0 0 5px rgba(255,255,255,0.30), ' +
-                    'inset 0 1px 0 rgba(255,255,255,0.40)';
+                    '0 0 15px rgba(59,130,246,0.60), 0 0 30px rgba(59,130,246,0.25), inset 0 0 5px rgba(255,255,255,0.30), inset 0 1px 0 rgba(255,255,255,0.40)';
                 }}
               >
-                CONNECT OPERATOR
+                {phase === 'connecting' ? 'OPENING WALLET...'
+                  : phase === 'signing'    ? 'AWAITING SIGNATURE...'
+                  : phase === 'denied'     ? 'RETRY CONNECTION'
+                  : 'CONNECT OPERATOR'}
               </button>
 
+              {/* Watch-only slot */}
               <div style={{ marginTop: '10px' }}>
                 <div className="font-mono" style={{
                   fontSize: '8px', letterSpacing: '0.16em',
                   color: T.text.muted, opacity: 0.3,
                   marginBottom: '5px', textTransform: 'uppercase',
-                }}>
-                  Watch-Only Mode
-                </div>
+                }}>Watch-Only Mode</div>
                 <input
                   type="text"
                   value={watchAddress}
@@ -221,22 +305,22 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                 />
               </div>
 
+              {/* Status dot */}
               <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.35 }}>
                 <div className="dot-pulse" style={{
                   width: '5px', height: '5px', borderRadius: '50%',
-                  backgroundColor: 'rgba(168,85,247,0.85)',
+                  backgroundColor: phase === 'denied' ? T.color.red : 'rgba(168,85,247,0.85)',
                 }} />
                 <span className="font-mono" style={{ fontSize: '9px', color: T.text.muted, letterSpacing: '0.12em' }}>
-                  AWAITING OPERATOR CREDENTIALS
+                  {phase === 'denied' ? 'LINK REJECTED — RETRY TO RECONNECT' : 'AWAITING OPERATOR CREDENTIALS'}
                 </span>
               </div>
             </>
           )}
 
-          {/* ── BOOT STATE — initialization sequence ──────────────────── */}
+          {/* ── BOOT SEQUENCE — runs after real signature confirmed ────── */}
           {isBooting && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '160px' }}>
-              {/* Header stays visible during boot */}
               <div className="font-bold font-mono flex items-center gap-1" style={{
                 fontSize: '13px', color: '#f4f4f5', letterSpacing: '0.06em', marginBottom: '6px',
               }}>
@@ -244,51 +328,26 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                 <span> INITIALIZING...</span>
               </div>
 
-              {/* Terminal log lines — revealed one by one */}
-              {BOOT_SEQUENCE.slice(0, visibleLines).map((line, i) => {
-                const isLast     = i === BOOT_SEQUENCE.length - 1;
-                const isComplete = phase === 'complete' || phase === 'fading';
-
+              {/* All lines (first 2 synthetic, rest from POST_SIGN_LINES) */}
+              {displayLines.slice(0, visibleLines + 2).map((line, i) => {
+                const isLastLine = i === displayLines.length - 1;
+                const isResolved = phase === 'complete' || phase === 'fading';
                 return (
-                  <div
-                    key={i}
-                    className="boot-line font-mono"
-                    style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '0' }}
-                  >
-                    {/* Prompt */}
-                    <span style={{ color: T.text.muted, opacity: 0.5, marginRight: '4px' }}>
-                      {line.prefix}
-                    </span>
-
-                    {/* Body text */}
+                  <div key={i} className="boot-line font-mono"
+                    style={{ fontSize: '11px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ color: T.text.muted, opacity: 0.5, marginRight: '4px' }}>&gt;</span>
                     <span style={{ color: T.text.secondary }}>{line.body}</span>
-
-                    {/* Progress blocks — Neon Mint */}
                     {line.blocks && (
-                      <span style={{
-                        color:      T.color.green,
-                        fontWeight: 700,
-                        textShadow: '0 0 8px rgba(34,197,94,0.6)',
-                      }}>
+                      <span style={{ color: T.color.green, fontWeight: 700, textShadow: '0 0 8px rgba(34,197,94,0.6)' }}>
                         {line.blocks}
                       </span>
                     )}
-
-                    {/* Suffix */}
-                    {line.suffix && (
-                      <span style={{ color: T.text.secondary }}>{line.suffix}</span>
-                    )}
-
-                    {/* Checkmark — Neon Mint, only on final line + complete */}
-                    {line.check && isLast && (
+                    {line.suffix && <span style={{ color: T.text.secondary }}>{line.suffix}</span>}
+                    {line.check && isLastLine && (
                       <span style={{
-                        color:      T.color.green,
-                        fontWeight: 700,
-                        fontSize:   '13px',
-                        textShadow: `0 0 12px rgba(34,197,94,0.9), 0 0 24px rgba(34,197,94,0.5)`,
-                        marginLeft: '2px',
-                        // Pulse briefly on complete
-                        opacity:    isComplete ? 1 : 0.8,
+                        color: T.color.green, fontWeight: 700, fontSize: '13px', marginLeft: '2px',
+                        textShadow: '0 0 12px rgba(34,197,94,0.9), 0 0 24px rgba(34,197,94,0.5)',
+                        opacity: isResolved ? 1 : 0.8,
                       }}>
                         {line.check}
                       </span>
@@ -297,25 +356,17 @@ export function OperatorBridge({ onConnect }: OperatorBridgeProps) {
                 );
               })}
 
-              {/* Blinking cursor on the current line while booting */}
-              {phase === 'booting' && visibleLines < BOOT_SEQUENCE.length && (
-                <span className="auth-cursor font-mono" style={{
-                  fontSize: '11px', color: 'rgba(139,92,246,0.7)',
-                }}>▋</span>
+              {phase === 'booting' && (
+                <span className="auth-cursor font-mono" style={{ fontSize: '11px', color: 'rgba(139,92,246,0.7)' }}>▋</span>
               )}
 
-              {/* ESTABLISHED glow — lights up the whole module on resolve */}
-              {phase === 'complete' && (
+              {(phase === 'complete' || phase === 'fading') && (
                 <div style={{
-                  marginTop:   '8px',
-                  fontSize:    '9px',
-                  fontFamily:  'monospace',
-                  letterSpacing: '0.14em',
-                  color:       T.color.green,
-                  opacity:     0.6,
-                  textShadow:  '0 0 10px rgba(34,197,94,0.5)',
+                  marginTop: '8px', fontSize: '9px', fontFamily: 'monospace',
+                  letterSpacing: '0.14em', color: T.color.green, opacity: 0.7,
+                  textShadow: '0 0 10px rgba(34,197,94,0.5)',
                 }}>
-                  ● OPERATOR LINK ACTIVE
+                  ● OPERATOR LINK ACTIVE — {walletAddr.slice(0,6)}…{walletAddr.slice(-4)}
                 </div>
               )}
             </div>

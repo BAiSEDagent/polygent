@@ -28,7 +28,7 @@ export function Dashboard() {
   const realActivities = actData?.activity   ?? [];
   const activities     = useSimulation(realActivities, true);
 
-  const handleOperatorConnected = () => {
+  const handleOperatorConnected = (_address: string) => {
     setBridgeVisible(false);
     // Trigger global Electric Blue grid pulse
     setGridFlash(true);
