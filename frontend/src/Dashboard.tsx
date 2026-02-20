@@ -11,11 +11,12 @@ import { AgentProfile } from './components/AgentProfile';
 import { OperatorBridge } from './components/OperatorBridge';
 
 export function Dashboard() {
-  const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [selectedAgent,  setSelectedAgent]  = useState<any>(null);
+  const [bridgeVisible,  setBridgeVisible]  = useState(true);
 
   const healthFetch = useCallback(() => api.getHealth(), []);
-  const lbFetch    = useCallback(() => api.getLeaderboard(), []);
-  const actFetch   = useCallback(() => api.getActivity(100), []);
+  const lbFetch     = useCallback(() => api.getLeaderboard(), []);
+  const actFetch    = useCallback(() => api.getActivity(100), []);
 
   const { data: health  } = usePolling(healthFetch, 5000);
   const { data: lbData  } = usePolling(lbFetch, 4000);
@@ -60,8 +61,6 @@ export function Dashboard() {
         <MissionControl activities={activities} agents={health?.agents ?? 0} />
 
         {/* ── TIER 2 + 3: Shared 2-col grid (1fr | 300px) ───────────────── */}
-        {/* Leaderboard snaps to OpsBoard width exactly; Intel Feed column    */}
-        {/* stays empty above itself — no spanning, pure alignment            */}
         <div
           style={{
             display:             'grid',
@@ -71,16 +70,19 @@ export function Dashboard() {
             alignItems:          'start',
           }}
         >
-          {/* ROW 1, COL 1 — Leaderboard: width = OpsBoard width exactly */}
+          {/* ROW 1, COL 1 — Leaderboard */}
           <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
 
-          {/* ROW 1, COL 2 — Operator Bridge: security gate, width = Intel Feed */}
-          <OperatorBridge />
+          {/* ROW 1, COL 2 — Operator Bridge (hidden after init sequence completes) */}
+          {bridgeVisible
+            ? <OperatorBridge onConnect={() => setBridgeVisible(false)} />
+            : <div />   /* void — keeps grid intact after bridge dismisses */
+          }
 
           {/* ROW 2, COL 1 — Live Operations Board */}
           <OpsBoard activities={activities} />
 
-          {/* ROW 2, COL 2 — Intel Feed, sticky. Starts at OpsBoard level. Space above = void. */}
+          {/* ROW 2, COL 2 — Intel Feed, sticky */}
           <div className="xl:sticky" style={{ top: '8px' }}>
             <IntelFeed activities={activities} />
           </div>
