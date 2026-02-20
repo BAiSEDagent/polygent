@@ -8,6 +8,7 @@ import { OpsBoard } from './components/OpsBoard';
 import { IntelFeed } from './components/IntelFeed';
 import { Leaderboard } from './components/Leaderboard';
 import { AgentProfile } from './components/AgentProfile';
+import { OperatorBridge } from './components/OperatorBridge';
 
 export function Dashboard() {
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
@@ -73,8 +74,8 @@ export function Dashboard() {
           {/* ROW 1, COL 1 — Leaderboard: width = OpsBoard width exactly */}
           <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
 
-          {/* ROW 1, COL 2 — Empty: space above Intel Feed is void */}
-          <div />
+          {/* ROW 1, COL 2 — Operator Bridge: security gate, width = Intel Feed */}
+          <OperatorBridge />
 
           {/* ROW 2, COL 1 — Live Operations Board */}
           <OpsBoard activities={activities} />
