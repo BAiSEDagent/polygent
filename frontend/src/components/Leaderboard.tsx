@@ -239,11 +239,15 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
           }}
           onMouseEnter={e => {
             e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.14)';
-            e.currentTarget.style.boxShadow       = `0 0 10px rgba(59,130,246,0.2)`;
+            e.currentTarget.style.boxShadow       = '0 0 14px rgba(59,130,246,0.35)';
+            e.currentTarget.style.color            = '#60a5fa';
+            e.currentTarget.style.textShadow       = '0 0 10px rgba(59,130,246,0.6)';
           }}
           onMouseLeave={e => {
             e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.06)';
             e.currentTarget.style.boxShadow       = 'none';
+            e.currentTarget.style.color            = '#3b82f6';
+            e.currentTarget.style.textShadow       = 'none';
           }}
         >
           {expanded ? '[ COLLAPSE ]' : '[ VIEW ALL STRATEGIES ]'}
