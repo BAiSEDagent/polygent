@@ -30,12 +30,23 @@ export function Dashboard() {
       style={{
         backgroundColor: '#050505',
         backgroundImage:
-          'linear-gradient(to right, rgba(100,116,139,0.1) 1px, transparent 1px), ' +
-          'linear-gradient(to bottom, rgba(100,116,139,0.1) 1px, transparent 1px)',
+          'linear-gradient(to right, rgba(100,116,139,0.03) 1px, transparent 1px), ' +
+          'linear-gradient(to bottom, rgba(100,116,139,0.03) 1px, transparent 1px)',
         backgroundSize: '24px 24px',
         color: '#cbd5e1',
       }}
     >
+      {/* Vignette depth — center bright, edges absorb into void */}
+      <div
+        aria-hidden
+        style={{
+          position:      'fixed',
+          inset:         0,
+          pointerEvents: 'none',
+          zIndex:        0,
+          background:    'radial-gradient(circle, transparent 40%, rgba(0,0,0,0.80) 100%)',
+        }}
+      />
       <Header
         wsConnected={health?.liveData?.wsConnected ?? false}
         marketsLoaded={health?.liveData?.marketsLoaded ?? 0}

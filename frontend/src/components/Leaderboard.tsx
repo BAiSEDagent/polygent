@@ -151,7 +151,7 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
     <section
       style={{
         border:          `1px solid ${T.border.DEFAULT}`,
-        backgroundColor: 'rgba(0,0,0,0.60)',
+        backgroundColor: 'rgba(3,3,3,0.95)',
         // Recessed trench: multi-layer inset shadow for physical depth
         boxShadow:
           'inset 0 2px 20px rgba(0,0,0,0.90), ' +

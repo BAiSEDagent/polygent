@@ -16,12 +16,12 @@ export const INDUSTRIAL_THEME = {
   // ── Blueprint grid (applied via backgroundImage) ───────────────────────────
   grid: {
     image:
-      'linear-gradient(to right, rgba(100,116,139,0.1) 1px, transparent 1px), ' +
-      'linear-gradient(to bottom, rgba(100,116,139,0.1) 1px, transparent 1px)',
+      'linear-gradient(to right, rgba(100,116,139,0.03) 1px, transparent 1px), ' +
+      'linear-gradient(to bottom, rgba(100,116,139,0.03) 1px, transparent 1px)',
     size: '24px 24px',
     imageSubtle:
-      'linear-gradient(to right, rgba(100,116,139,0.18) 1px, transparent 1px), ' +
-      'linear-gradient(to bottom, rgba(100,116,139,0.18) 1px, transparent 1px)',
+      'linear-gradient(to right, rgba(100,116,139,0.025) 1px, transparent 1px), ' +
+      'linear-gradient(to bottom, rgba(100,116,139,0.025) 1px, transparent 1px)',
   },
 
   // ── Text ───────────────────────────────────────────────────────────────────
