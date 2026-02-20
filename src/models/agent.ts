@@ -110,6 +110,52 @@ class AgentStore {
     return agent;
   }
 
+  /**
+   * Create an external agent — one that brings their own wallets.
+   * No private key is stored; the EOA address is used for EIP-712 verification
+   * on the /relay endpoint. The proxy wallet is the Polymarket Gnosis Safe.
+   * The agent appears on the Leaderboard immediately with zeroed equity.
+   */
+  createExternal(params: {
+    id: string;
+    name: string;
+    description?: string;
+    strategy?: string;
+    apiKeyHash: string;
+    walletAddress: string;  // EOA — signer
+    proxyWallet: string;    // Gnosis Safe — order maker / USDC holder
+  }): Agent {
+    const now = Date.now();
+    const agent: Agent = {
+      id: params.id,
+      name: params.name,
+      description: params.description,
+      strategy: params.strategy,
+      apiKeyHash: params.apiKeyHash,
+      walletAddress: params.walletAddress,
+      proxyWallet: params.proxyWallet,
+      status: 'active',
+      config: { ...DEFAULT_CONFIG },
+      // Equity is symbolic for external agents — they hold their own USDC.
+      // We track volume/PnL from recorded trades for Leaderboard display.
+      equity: {
+        deposited: 0,
+        current: 0,
+        peakEquity: 0,
+        dailyStartEquity: 0,
+      },
+      lastActivity: now,
+      registeredViaApi: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // No private key stored — external agents sign their own orders.
+    this.agents.set(agent.id, agent);
+    this.apiKeyIndex.set(params.apiKeyHash, agent.id);
+    return agent;
+  }
+
   count(): number {
     return this.agents.size;
   }
