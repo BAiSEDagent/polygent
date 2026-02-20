@@ -3,6 +3,7 @@ import agentsRouter from './agents';
 import ordersRouter from './orders';
 import marketsRouter from './markets';
 import portfolioRouter from './portfolio';
+import copiersRouter from './copiers';
 import { liveDataService } from '../core/live-data';
 import { agentRunner } from '../core/agent-runner';
 import { paperTrader } from '../core/paper-trader';
@@ -16,6 +17,7 @@ router.use('/agents', agentsRouter);
 router.use('/orders', ordersRouter);
 router.use('/markets', marketsRouter);
 router.use('/portfolio', portfolioRouter);
+router.use('/copiers', copiersRouter);
 
 // ─── Live Agent Endpoints ────────────────────────────────────────────────────
 

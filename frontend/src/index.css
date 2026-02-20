@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+html, body, #root { width: 100%; min-height: 100vh; overflow-x: hidden; overflow-y: auto !important; }
 body { background: #0A0B0E; color: #fff; font-family: 'Inter', system-ui, sans-serif; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
