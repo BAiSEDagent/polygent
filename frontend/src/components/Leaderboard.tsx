@@ -108,15 +108,15 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
   const hasMore = agents.length > PREVIEW_COUNT;
 
   return (
-    // Fluid height — grows with content; only the rows scroll internally
+    // Locked flex-col — fills rail exactly; header + footer shrink-0; rows scroll
     <section
       className="rounded-sm flex flex-col"
       style={{
         border:          `1px solid ${T.border.DEFAULT}`,
         backgroundColor: 'rgba(5,5,5,0.6)',
-        // No rigid height — section fits content naturally
-        minHeight:       0,
-        overflow:        'visible',
+        // height:100% resolves because parent now has a definite height in Dashboard
+        height:          '100%',
+        overflow:        'hidden',
       }}
     >
       {/* Header */}
@@ -142,12 +142,14 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
         <span style={{ textAlign: 'right' }}>AUM</span>
       </div>
 
-      {/* Rows — explicit max-h so only rows scroll, header/footer stay fixed */}
+      {/* Scroll zone — flex:1 fills remaining space after header+footer; rows scroll within */}
       <div
         className="px-4 overflow-y-auto"
         style={{
-          // 500px cap — scrollable internal rail, never clips header or VIEW ALL
-          maxHeight:      '500px',
+          // flex:1 = "take all remaining height after header and button are rendered"
+          // No max-height — flexbox owns the calculation. VIEW ALL is always visible below.
+          flex:           1,
+          overflowY:      'auto',
           // Electric Blue thin-rail scrollbar
           scrollbarWidth: 'thin',
           scrollbarColor: `${T.color.blue} rgba(0,0,0,0.4)`,
@@ -156,6 +158,9 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
           gap:            '6px',
           paddingBottom:  '8px',
           paddingTop:     '4px',
+          // Isolation — no z-index bleed onto the anchored button below
+          position:       'relative',
+          zIndex:         0,
         }}
       >
         {(expanded ? agents : agents.slice(0, PREVIEW_COUNT)).map((agent, i) => (
