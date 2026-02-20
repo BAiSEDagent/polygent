@@ -45,8 +45,7 @@ function formatAum(equity: number): string {
   return `$${equity.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-// ── THE BLADE ─────────────────────────────────────────────────────────────────
-// Full-width horizontal row, smoked glass, blueprint grid refracting through
+// ── THE BLADE — slim-line data strip, heavy glass mute ────────────────────────
 function AgentRow({ agent, rank, onSelectAgent }: {
   agent: any; rank: number; onSelectAgent: (a: any) => void;
 }) {
@@ -59,79 +58,75 @@ function AgentRow({ agent, rank, onSelectAgent }: {
       onClick={() => onSelectAgent(agent)}
       className="w-full rounded-sm transition-all"
       style={{
-        // Smoked Glass — bg-black/60 + backdrop-blur-md + blueprint grid refracts through
-        backgroundColor:      'rgba(0,0,0,0.60)',
-        backdropFilter:       'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        // Heavy Glass Mute — grid barely visible, text pops
+        backgroundColor:      'rgba(0,0,0,0.92)',
+        backdropFilter:       'blur(25px)',
+        WebkitBackdropFilter: 'blur(25px)',
         backgroundImage:      T.grid.imageSubtle,
         backgroundSize:       T.grid.size,
         border:               `1px solid ${T.border.subtle}`,
-        // Row layout
+        // Slim-line density — py-2
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'space-between',
-        padding:        '10px 16px',
+        padding:        '8px 14px',   // py-2 equivalent, tight data strip
         gap:            '12px',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = 'rgba(59,130,246,0.45)';
-        e.currentTarget.style.boxShadow   = '0 0 14px rgba(59,130,246,0.10)';
+        e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.85)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = T.border.subtle;
-        e.currentTarget.style.boxShadow   = 'none';
+        e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.92)';
       }}
     >
-      {/* LEFT — Rank glyph + Agent Name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-        {/* Rank — triple-layer tier glow */}
+      {/* LEFT — Rank + Name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
         <span
           className="font-bold font-mono shrink-0"
-          style={{ fontSize: '14px', width: '28px', textAlign: 'left', color: rs.color, textShadow: rs.textShadow }}
+          style={{ fontSize: '13px', width: '26px', textAlign: 'left', color: rs.color, textShadow: rs.textShadow }}
         >
           {rs.label}
         </span>
-
-        {/* Agent Name — white, bold monospace, the star */}
         <span
           className="font-bold font-mono truncate"
-          style={{ fontSize: '13px', color: '#f4f4f5' }}
+          style={{ fontSize: '12px', color: '#f4f4f5' }}
         >
           {agent.agentName}
         </span>
       </div>
 
       {/* RIGHT — ROI pill + AUM */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
-
-        {/* ROI — recessed pill (bg-opacity-10, border-opacity-30) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+        {/* ROI — recessed pill */}
         <span
           className="font-bold font-mono"
           style={{
-            fontSize:        '11px',
-            padding:         '3px 10px',
+            fontSize:        '10px',
+            padding:         '2px 8px',
             borderRadius:    '2px',
             backgroundColor: pnlPos ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)',
             border:          `1px solid ${pnlPos ? 'rgba(34,197,94,0.30)' : 'rgba(239,68,68,0.30)'}`,
             color:           '#f4f4f5',
-            minWidth:        '64px',
+            minWidth:        '58px',
             textAlign:       'right',
           }}
         >
           {pnlPos ? '+' : ''}{pnlPct.toFixed(1)}%
         </span>
 
-        {/* AUM — label dimmed 30%, value in electric blue */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+        {/* AUM — label 30% opacity + Electric Blue value */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
           <span
-            className="font-bold font-mono"
-            style={{ fontSize: '10px', letterSpacing: '0.12em', color: T.text.muted, opacity: 0.3 }}
+            className="font-mono"
+            style={{ fontSize: '9px', letterSpacing: '0.12em', color: T.text.muted, opacity: 0.3 }}
           >
             AUM
           </span>
           <span
             className="font-bold font-mono"
-            style={{ fontSize: '13px', color: T.color.blue }}
+            style={{ fontSize: '12px', color: T.color.blue, minWidth: '54px', textAlign: 'right' }}
           >
             {formatAum(agent.currentEquity ?? 0)}
           </span>
@@ -141,7 +136,7 @@ function AgentRow({ agent, rank, onSelectAgent }: {
   );
 }
 
-// ── THE SERVER RACK ────────────────────────────────────────────────────────────
+// ── THE SERVER RACK — Recessed Trench, snaps to OpsBoard width ────────────────
 export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -152,47 +147,52 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
   const hasMore = agents.length > PREVIEW;
 
   return (
+    // Recessed Trench — inset shadow makes it look physically sunken into the dashboard
     <section
       style={{
         border:          `1px solid ${T.border.DEFAULT}`,
-        backgroundColor: 'rgba(5,5,5,0.75)',
-        padding:         '10px 14px 12px',
+        backgroundColor: 'rgba(0,0,0,0.60)',
+        // Recessed trench: multi-layer inset shadow for physical depth
+        boxShadow:
+          'inset 0 2px 20px rgba(0,0,0,0.90), ' +
+          'inset 0 0 60px rgba(0,0,0,0.60), ' +
+          'inset 0 1px 0 rgba(255,255,255,0.03)',
+        padding: '8px 10px 10px',
       }}
     >
-      {/* Header */}
+      {/* Header — minimal, aligned to OpsBoard aesthetic */}
       <div
         className="flex items-center justify-between"
-        style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: `1px solid ${T.border.subtle}` }}
+        style={{ marginBottom: '6px', paddingBottom: '6px', borderBottom: `1px solid rgba(255,255,255,0.05)` }}
       >
         <div className="flex items-center gap-2">
-          <span style={{ color: T.text.muted, fontSize: '13px', fontFamily: 'monospace' }}>&gt;_</span>
+          <span style={{ color: T.text.muted, fontSize: '11px', fontFamily: 'monospace', opacity: 0.5 }}>&gt;_</span>
           <h2
-            className="font-bold font-mono text-[12px] tracking-widest uppercase"
-            style={{ color: T.text.primary }}
+            className="font-bold font-mono uppercase"
+            style={{ fontSize: '10px', letterSpacing: '0.16em', color: T.text.muted, opacity: 0.6 }}
           >
             Agent Leaderboard
           </h2>
-          <span className="font-mono text-[10px]" style={{ color: T.text.muted, opacity: 0.5 }}>
+          <span style={{ fontSize: '9px', fontFamily: 'monospace', color: T.text.muted, opacity: 0.3 }}>
             {agents.length} agents
           </span>
         </div>
 
-        {/* Column labels */}
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <span className="font-mono" style={{ fontSize: '9px', letterSpacing: '0.14em', color: T.text.muted, opacity: 0.35 }}>ROI</span>
-          <span className="font-mono" style={{ fontSize: '9px', letterSpacing: '0.14em', color: T.text.muted, opacity: 0.35, minWidth: '80px', textAlign: 'right' }}>AUM</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <span style={{ fontSize: '9px', fontFamily: 'monospace', letterSpacing: '0.12em', color: T.text.muted, opacity: 0.3 }}>ROI</span>
+          <span style={{ fontSize: '9px', fontFamily: 'monospace', letterSpacing: '0.12em', color: T.text.muted, opacity: 0.3, minWidth: '72px', textAlign: 'right' }}>AUM</span>
           {hasMore && (
             <button
               onClick={() => setExpanded(v => !v)}
-              className="font-mono font-bold text-[11px] transition-all"
-              style={{ color: expanded ? T.text.muted : T.color.blue, letterSpacing: '0.06em' }}
+              className="font-mono font-bold transition-all"
+              style={{ fontSize: '10px', color: T.color.blue, letterSpacing: '0.08em' }}
               onMouseEnter={e => {
                 e.currentTarget.style.textShadow = '0 0 10px rgba(59,130,246,0.7)';
                 e.currentTarget.style.color = '#60a5fa';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.textShadow = 'none';
-                e.currentTarget.style.color = expanded ? T.text.muted : T.color.blue;
+                e.currentTarget.style.color = T.color.blue;
               }}
             >
               {expanded ? '← LESS' : 'MORE →'}
@@ -201,8 +201,8 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
         </div>
       </div>
 
-      {/* THE BLADES — vertical server rack, gap-y-2 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* Blades — slim-line, gap-y-2 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {visible.map((agent, i) => (
           <AgentRow
             key={agent.agentId}

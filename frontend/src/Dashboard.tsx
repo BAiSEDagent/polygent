@@ -44,26 +44,35 @@ export function Dashboard() {
 
       <main className="p-4 lg:p-6" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-        {/* ── TIER 1: Global Stats Rail ──────────────────────────────────── */}
+        {/* ── TIER 1: Global Stats Rail — full width ─────────────────────── */}
         <MissionControl activities={activities} agents={health?.agents ?? 0} />
 
-        {/* ── TIER 2: Agent Leaderboard — full-width horizontal pod rail ─── */}
-        <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
-
-        {/* ── TIER 3: Live Ops + Intel Feed — 2-col grid ─────────────────── */}
+        {/* ── TIER 2 + 3: Shared 2-col grid (1fr | 300px) ───────────────── */}
+        {/* Leaderboard snaps to OpsBoard width exactly; Intel Feed column    */}
+        {/* stays empty above itself — no spanning, pure alignment            */}
         <div
           style={{
             display:             'grid',
             gridTemplateColumns: '1fr 300px',
+            gridTemplateRows:    'auto auto',
             gap:                 '12px',
             alignItems:          'start',
           }}
         >
+          {/* ROW 1, COL 1 — Leaderboard: width = OpsBoard width exactly */}
+          <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
+
+          {/* ROW 1, COL 2 — Empty: space above Intel Feed is void */}
+          <div />
+
+          {/* ROW 2, COL 1 — Live Operations Board */}
           <OpsBoard activities={activities} />
 
+          {/* ROW 2, COL 2 — Intel Feed, sticky. Starts at OpsBoard level. Space above = void. */}
           <div className="xl:sticky" style={{ top: '8px' }}>
             <IntelFeed activities={activities} />
           </div>
+
         </div>
 
       </main>
