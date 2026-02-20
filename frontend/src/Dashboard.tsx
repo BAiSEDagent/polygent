@@ -42,46 +42,30 @@ export function Dashboard() {
         agents={health?.agents ?? 0}
       />
 
-      <main className="p-4 lg:p-6" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <main className="p-4 lg:p-6" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-        {/* ── ETCHED STAT HEADER ─────────────────────────────────────────── */}
+        {/* ── TIER 1: Global Stats Rail ──────────────────────────────────── */}
         <MissionControl activities={activities} agents={health?.agents ?? 0} />
 
-        {/* ── COCKPIT — three-column bracket layout ──────────────────────── */}
+        {/* ── TIER 2: Agent Leaderboard — full-width horizontal pod rail ─── */}
+        <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
+
+        {/* ── TIER 3: Live Ops + Intel Feed — 2-col grid ─────────────────── */}
         <div
           style={{
-            display: 'grid',
-            // [Left rail: Leaderboard] [Center: Ops Board] [Right rail: Intel Feed]
-            gridTemplateColumns: '320px 1fr 300px',
-            gap: '16px',
-            alignItems: 'start',
+            display:             'grid',
+            gridTemplateColumns: '1fr 300px',
+            gap:                 '12px',
+            alignItems:          'start',
           }}
         >
-          {/* LEFT RAIL — strict flex column, definite height, overflow hidden */}
-          <div
-            className="xl:sticky"
-            style={{
-              top:           '8px',
-              height:        'calc(100vh - 140px)',
-              display:       'flex',
-              flexDirection: 'column',
-              overflow:      'hidden',
-            }}
-          >
-            <Leaderboard agents={leaderboard} onSelectAgent={setSelectedAgent} />
-          </div>
-
-          {/* CENTER — Live Operations Board, expands to fill */}
           <OpsBoard activities={activities} />
 
-          {/* RIGHT RAIL — Intel Feed, sticky */}
-          <div
-            className="xl:sticky"
-            style={{ top: '8px' }}
-          >
+          <div className="xl:sticky" style={{ top: '8px' }}>
             <IntelFeed activities={activities} />
           </div>
         </div>
+
       </main>
 
       {selectedAgent && (

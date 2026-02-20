@@ -6,36 +6,33 @@ interface LeaderboardProps {
   onSelectAgent: (agent: any) => void;
 }
 
-const COLS = '34px 1fr 68px 66px';
-const GAP  = '6px';
-
-function getRankStyle(rank: number): { color: string; glow: string; label: string; size: string } {
+function getRankStyle(rank: number) {
   if (rank === 0) return {
     color: '#fbbf24',
-    glow:  '0 0 4px #fbbf24, 0 0 10px rgba(251,191,36,0.8), 0 0 20px rgba(251,191,36,0.5)',
-    label: '#1', size: '15px',
+    textShadow: '0 0 4px #fbbf24, 0 0 12px rgba(251,191,36,0.8), 0 0 28px rgba(251,191,36,0.5)',
+    label: '#1',
   };
   if (rank === 1) return {
     color: '#e2e8f0',
-    glow:  '0 0 8px rgba(226,232,240,0.6)',
-    label: '#2', size: '13px',
+    textShadow: '0 0 8px rgba(226,232,240,0.7), 0 0 18px rgba(226,232,240,0.4)',
+    label: '#2',
   };
   if (rank === 2) return {
     color: '#94a3b8',
-    glow:  '0 0 8px rgba(226,232,240,0.6)',
-    label: '#3', size: '13px',
+    textShadow: '0 0 8px rgba(148,163,184,0.7)',
+    label: '#3',
   };
   if (rank === 3) return {
     color: '#d97706',
-    glow:  '0 0 8px rgba(217,119,6,0.4)',
-    label: '#4', size: '13px',
+    textShadow: '0 0 8px rgba(217,119,6,0.6), 0 0 18px rgba(217,119,6,0.3)',
+    label: '#4',
   };
   if (rank === 4) return {
     color: '#b45309',
-    glow:  '0 0 8px rgba(217,119,6,0.4)',
-    label: '#5', size: '13px',
+    textShadow: '0 0 8px rgba(180,83,9,0.5)',
+    label: '#5',
   };
-  return { color: T.text.muted, glow: 'none', label: `#${rank + 1}`, size: '12px' };
+  return { color: T.text.muted, textShadow: 'none', label: `#${rank + 1}` };
 }
 
 function formatAum(equity: number): string {
@@ -44,57 +41,82 @@ function formatAum(equity: number): string {
   return `$${equity.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-function AgentRow({ agent, rank, onSelectAgent }: {
+function AgentPod({ agent, rank, onSelectAgent }: {
   agent: any; rank: number; onSelectAgent: (a: any) => void;
 }) {
   const rs     = getRankStyle(rank);
   const pnlPct = agent.totalPnlPct ?? 0;
   const pnlPos = pnlPct >= 0;
-  const isTop  = rank === 0;
 
   return (
     <button
       onClick={() => onSelectAgent(agent)}
-      className="w-full font-mono text-left rounded-sm px-2 py-2.5 transition-all"
+      className="flex-1 text-left transition-all rounded-sm"
       style={{
-        display: 'grid', gridTemplateColumns: COLS, gap: GAP, alignItems: 'center',
+        // Smoked glass pod
         backgroundColor:     'rgba(0,0,0,0.6)',
         backdropFilter:      'blur(12px)',
         WebkitBackdropFilter:'blur(12px)',
         border:              `1px solid ${T.border.subtle}`,
-        backgroundImage:     T.grid.image,
+        backgroundImage:     T.grid.imageSubtle,
         backgroundSize:      T.grid.size,
+        padding:             '10px 14px 12px',
+        display:             'flex',
+        flexDirection:       'column',
+        gap:                 '6px',
+        minWidth:            0,
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)';
-        e.currentTarget.style.boxShadow   = '0 0 12px rgba(59,130,246,0.1)';
+        e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)';
+        e.currentTarget.style.boxShadow   = '0 0 16px rgba(59,130,246,0.12)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = T.border.subtle;
         e.currentTarget.style.boxShadow   = 'none';
       }}
     >
-      <span className="font-bold font-mono shrink-0"
-        style={{ fontSize: rs.size, color: rs.color, textShadow: rs.glow }}>
-        {rs.label}
-      </span>
-      <span className="truncate font-mono"
-        style={{ fontSize: '12px', fontWeight: 500, color: isTop ? T.text.primary : T.text.secondary }}>
-        {agent.agentName}
-      </span>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <span className="font-bold font-mono" style={{
-          fontSize: '11px', padding: '2px 8px', borderRadius: '2px',
-          backgroundColor: pnlPos ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)',
-          border:  `1px solid ${pnlPos ? 'rgba(34,197,94,0.30)' : 'rgba(239,68,68,0.30)'}`,
-          color:   '#f4f4f5', minWidth: '58px', textAlign: 'right', display: 'inline-block',
-        }}>
+      {/* Top row: rank glyph + ROI pill */}
+      <div className="flex items-center justify-between">
+        <span
+          className="font-bold font-mono"
+          style={{ fontSize: '13px', color: rs.color, textShadow: rs.textShadow }}
+        >
+          {rs.label}
+        </span>
+        <span
+          className="font-bold font-mono"
+          style={{
+            fontSize:        '10px',
+            padding:         '2px 7px',
+            borderRadius:    '2px',
+            backgroundColor: pnlPos ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)',
+            border:          `1px solid ${pnlPos ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+            color:           '#f4f4f5',
+          }}
+        >
           {pnlPos ? '+' : ''}{pnlPct.toFixed(1)}%
         </span>
       </div>
-      <span className="font-mono" style={{ fontSize: '12px', fontWeight: 700, color: T.color.blue, textAlign: 'right' }}>
+
+      {/* Agent name — white, bold monospace, fully visible */}
+      <div
+        className="font-bold font-mono truncate"
+        style={{
+          fontSize:   '13px',
+          color:      '#f4f4f5',
+          lineHeight: 1.2,
+        }}
+      >
+        {agent.agentName}
+      </div>
+
+      {/* AUM — electric blue */}
+      <div
+        className="font-bold font-mono"
+        style={{ fontSize: '12px', color: T.color.blue }}
+      >
         {formatAum(agent.currentEquity ?? 0)}
-      </span>
+      </div>
     </button>
   );
 }
@@ -104,94 +126,100 @@ export function Leaderboard({ agents, onSelectAgent }: LeaderboardProps) {
 
   if (!agents.length) return null;
 
-  const PREVIEW_COUNT = 5;
-  const hasMore = agents.length > PREVIEW_COUNT;
+  const PREVIEW = 5;
+  const visible = expanded ? agents : agents.slice(0, PREVIEW);
+  const hasMore = agents.length > PREVIEW;
 
   return (
-    // Nuclear flex-lock: flex:1 1 0% + min-height:0 = "Golden Rule"
-    // Forces section to stay inside the rail and never expand past it
     <section
-      className="rounded-sm flex flex-col"
       style={{
         border:          `1px solid ${T.border.DEFAULT}`,
-        backgroundColor: 'rgba(5,5,5,0.6)',
-        flex:            '1 1 0%',
-        minHeight:       0,
-        overflow:        'hidden',
+        backgroundColor: 'rgba(5,5,5,0.7)',
+        backdropFilter:  'blur(8px)',
+        padding:         '10px 14px',
       }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 pt-4 pb-3 shrink-0"
-        style={{ borderBottom: `1px solid ${T.border.subtle}` }}>
-        <span style={{ color: T.text.muted, fontSize: '13px', fontFamily: 'monospace' }}>&gt;_</span>
-        <h2 className="text-[13px] font-bold font-mono tracking-wide" style={{ color: T.text.primary }}>
-          AGENT LEADERBOARD
-        </h2>
-        <span className="ml-auto font-mono text-[10px]" style={{ color: T.text.muted }}>
-          {agents.length} agents
-        </span>
-      </div>
-
-      {/* Column headers */}
-      <div className="font-mono px-4 py-2 shrink-0" style={{
-        display: 'grid', gridTemplateColumns: COLS, gap: GAP,
-        color: T.text.muted, opacity: 0.4, fontSize: '9px', letterSpacing: '0.12em',
-      }}>
-        <span>RANK</span>
-        <span>AGENT</span>
-        <span style={{ textAlign: 'right' }}>ROI</span>
-        <span style={{ textAlign: 'right' }}>AUM</span>
-      </div>
-
-      {/* Scroll body — flex:1 1 0% + min-height:0 fills ONLY space between header and button */}
+      {/* Header rail */}
       <div
-        className="px-4"
+        className="flex items-center justify-between"
+        style={{ marginBottom: '10px' }}
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ color: T.text.muted, fontSize: '13px', fontFamily: 'monospace' }}>&gt;_</span>
+          <h2
+            className="font-bold font-mono text-[12px] tracking-widest uppercase"
+            style={{ color: T.text.primary }}
+          >
+            Agent Leaderboard
+          </h2>
+          <span
+            className="font-mono text-[10px]"
+            style={{ color: T.text.muted, opacity: 0.5 }}
+          >
+            {agents.length} agents
+          </span>
+        </div>
+
+        {/* Discovery tap — "More →" at far right */}
+        {hasMore && (
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="font-mono font-bold text-[11px] transition-all"
+            style={{
+              color:       expanded ? T.text.muted : T.color.blue,
+              letterSpacing: '0.06em',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.textShadow = '0 0 10px rgba(59,130,246,0.7)';
+              e.currentTarget.style.color = '#60a5fa';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.textShadow = 'none';
+              e.currentTarget.style.color = expanded ? T.text.muted : T.color.blue;
+            }}
+          >
+            {expanded ? '← LESS' : 'MORE →'}
+          </button>
+        )}
+      </div>
+
+      {/* Horizontal pod rail */}
+      <div
         style={{
-          flex:           '1 1 0%',
-          minHeight:      0,
-          overflowY:      'auto',
-          // Electric Blue thin-rail scrollbar
-          scrollbarWidth: 'thin',
-          scrollbarColor: `${T.color.blue} rgba(0,0,0,0.4)`,
-          display:        'flex',
-          flexDirection:  'column',
-          gap:            '6px',
-          paddingBottom:  '8px',
-          paddingTop:     '4px',
+          display: 'flex',
+          gap:     '10px',
+          alignItems: 'stretch',
         }}
       >
-        {(expanded ? agents : agents.slice(0, PREVIEW_COUNT)).map((agent, i) => (
-          <AgentRow key={agent.agentId} agent={agent} rank={i} onSelectAgent={onSelectAgent} />
+        {visible.map((agent, i) => (
+          <AgentPod
+            key={agent.agentId}
+            agent={agent}
+            rank={i}
+            onSelectAgent={onSelectAgent}
+          />
         ))}
       </div>
 
-      {/* [ VIEW ALL STRATEGIES ] / [ COLLAPSE ] — anchored at rail bottom */}
-      {hasMore && (
-        <div className="px-4 pb-4 pt-2 shrink-0" style={{ borderTop: `1px solid ${T.border.subtle}` }}>
-          <button
-            onClick={() => setExpanded(v => !v)}
-            className="w-full font-bold font-mono text-[11px] py-2 rounded-sm transition-all"
-            style={{
-              border:          `1px solid ${T.color.blue}`,
-              color:           T.color.blue,
-              backgroundColor: 'rgba(59,130,246,0.06)',
-              letterSpacing:   '0.1em',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.14)';
-              e.currentTarget.style.boxShadow       = '0 0 14px rgba(59,130,246,0.35)';
-              e.currentTarget.style.color           = '#60a5fa';
-              e.currentTarget.style.textShadow      = '0 0 10px rgba(59,130,246,0.6)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.06)';
-              e.currentTarget.style.boxShadow       = 'none';
-              e.currentTarget.style.color           = T.color.blue;
-              e.currentTarget.style.textShadow      = 'none';
-            }}
-          >
-            {expanded ? '[ COLLAPSE ]' : '[ VIEW ALL STRATEGIES ]'}
-          </button>
+      {/* Expanded overflow — wraps to second row if >5 */}
+      {expanded && agents.length > PREVIEW && (
+        <div
+          style={{
+            display:   'flex',
+            flexWrap:  'wrap',
+            gap:       '10px',
+            marginTop: '10px',
+          }}
+        >
+          {agents.slice(PREVIEW).map((agent, i) => (
+            <div key={agent.agentId} style={{ flex: '1 1 180px', maxWidth: '240px' }}>
+              <AgentPod
+                agent={agent}
+                rank={PREVIEW + i}
+                onSelectAgent={onSelectAgent}
+              />
+            </div>
+          ))}
         </div>
       )}
     </section>
