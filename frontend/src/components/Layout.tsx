@@ -26,7 +26,7 @@ export default function Layout() {
   const pnlStr = `${platformPnl >= 0 ? '+' : ''}$${Math.abs(platformPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: '#0A0B0E' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#0A0B0E' }}>
       {/* Top Bar */}
       <header className="h-12 flex items-center justify-between px-5 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-8">

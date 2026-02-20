@@ -42,20 +42,20 @@ export function AgentProfile({ agent, onClose }: AgentProfileProps) {
   const drawdown = agent.maxDrawdown ?? 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 backdrop-blur-sm px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-4xl border border-border bg-surface/50 backdrop-blur-sm rounded-sm overflow-hidden"
+        className="w-full max-w-4xl border border-white/10 bg-[#050505] rounded-sm overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-border flex items-start justify-between bg-grid-pattern">
+        <div className="p-6 border-b border-white/10 flex items-start justify-between bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]">
           <div className="flex gap-5">
             <div className="w-16 h-16 bg-primary/10 border border-primary/20 flex items-center justify-center rounded-sm">
               <span className="text-2xl text-primary">⚡</span>
             </div>
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-header tracking-tight">
+                <h1 className="text-2xl font-bold font-mono text-header tracking-tight">
                   {agent.agentName?.toUpperCase().replace(/ /g, '_') || 'AGENT'}
                 </h1>
                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 border border-success/20 text-[10px] text-success uppercase">
@@ -66,16 +66,16 @@ export function AgentProfile({ agent, onClose }: AgentProfileProps) {
                   Online
                 </span>
               </div>
-              <p className="text-sm text-muted">0x55ea...d922 · Deployed 1d ago</p>
+              <p className="text-sm text-zinc-500 font-mono">0x55ea...d922 · Deployed 1d ago</p>
             </div>
           </div>
-          <button onClick={() => setIsCopyModalOpen(true)} className="bg-primary hover:bg-primary/90 text-void font-bold px-6 py-2.5 rounded-sm transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.4)] text-[12px] uppercase tracking-wider">
+          <button onClick={() => setIsCopyModalOpen(true)} className="bg-[#3b82f6] hover:bg-[#2563eb] text-white font-mono font-bold px-6 py-2.5 rounded-sm transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.45)] text-[12px] uppercase tracking-tighter">
             ⚡ COPY STRATEGY
           </button>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 divide-x divide-border border-b border-border bg-void/50">
+        <div className="grid grid-cols-4 divide-x divide-white/10 border-b border-white/10 bg-[#050505]">
           {[
             { label: 'Total ROI', value: `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`, color: pnl >= 0 ? 'text-success' : 'text-danger' },
             { label: 'Win Rate', value: `${winRate.toFixed(1)}%`, color: 'text-header' },
@@ -147,7 +147,7 @@ export function AgentProfile({ agent, onClose }: AgentProfileProps) {
               <span className="text-muted">{'>'}_</span>
               <h3 className="text-sm font-bold text-header uppercase">Recent Execution</h3>
             </div>
-            <div className="bg-void/80 border border-border rounded-sm p-3 text-[11px] text-muted max-h-[100px] overflow-y-auto">
+            <div className="bg-[#020202] border border-white/[0.06] rounded-sm p-3 text-[11px] text-muted max-h-[100px] overflow-y-auto">
               <p className="text-header">[READY] {agent.agentName} initialized. Scanning markets...</p>
               <p className="text-success">[SCAN] 50 markets loaded. 4 arbitrage opportunities detected.</p>
               <p className="text-primary">[ORDER] BUY 5 @ $0.02 — "Will Trump deport 750k+"</p>
@@ -199,7 +199,7 @@ export function AgentProfile({ agent, onClose }: AgentProfileProps) {
                 </button>
               ))}
             </div>
-            <button className="mt-4 w-full bg-success hover:bg-success/90 text-void font-bold py-3 rounded-sm transition-all flex items-center justify-center gap-2 text-[12px] uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+            <button className="mt-4 w-full bg-[#22c55e] hover:bg-[#4ade80] text-black font-bold py-3 rounded-sm transition-all flex items-center justify-center gap-2 text-[12px] uppercase tracking-wider shadow-[0_0_18px_rgba(34,197,94,0.35)]">
               ↑ DEPLOY COPY-TRADE
             </button>
             <p className="mt-2 text-[10px] text-muted/50 text-center">20% performance fee on profits only.</p>
