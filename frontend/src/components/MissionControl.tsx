@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { INDUSTRIAL_THEME as T } from '../lib/theme';
 
 interface MissionControlProps {
   activities: any[];
@@ -39,13 +40,14 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
   };
 
   const cells = [
-    { label: 'NETWORK VOL',   value: fmt(stats.volume),     color: '#f4f4f5' },
-    { label: 'ACTIVE AGENTS', value: String(stats.agents),  color: '#3b82f6' },
-    { label: '24H TRADES',    value: String(stats.trades24h), color: '#f4f4f5' },
+    { label: 'NETWORK VOL',   value: fmt(stats.volume),       color: T.text.primary },
+    { label: 'ACTIVE AGENTS', value: String(stats.agents),    color: T.color.blue   },
+    { label: '24H TRADES',    value: String(stats.trades24h), color: T.text.primary },
     {
       label: 'GLOBAL PNL',
       value: `${stats.pnl >= 0 ? '+' : ''}${stats.pnl.toFixed(2)}%`,
-      color: stats.pnl >= 0 ? '#22c55e' : '#ef4444',
+      // Same vibrant green as the LED badges — visual continuity
+      color: stats.pnl >= 0 ? T.color.green : T.color.red,
     },
   ];
 
@@ -53,25 +55,24 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
     <div
       className="grid grid-cols-4 rounded-sm"
       style={{
-        border: '1px solid rgba(255,255,255,0.08)',
+        border: `1px solid ${T.border.DEFAULT}`,
         backgroundColor: 'rgba(15,15,16,0.5)',
-        // Inline dividers via CSS: each cell except the first gets a left border
       }}
     >
       {cells.map((c, i) => (
         <div
           key={i}
           className="px-6 py-4 text-center"
-          style={i > 0 ? { borderLeft: '1px solid rgba(255,255,255,0.08)' } : {}}
+          style={i > 0 ? { borderLeft: `1px solid ${T.border.DEFAULT}` } : {}}
         >
           <div
             className="text-[10px] uppercase font-mono mb-1.5"
-            style={{ color: '#71717a', letterSpacing: '0.15em' }}
+            style={{ color: T.text.muted, letterSpacing: '0.15em' }}
           >
             {c.label}
           </div>
           <div
-            className="text-3xl font-bold tracking-tight"
+            className="text-3xl font-bold font-mono tracking-tight"
             style={{ color: c.color }}
           >
             {c.value}
