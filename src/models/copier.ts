@@ -1,4 +1,5 @@
 import { decryptSecret, encryptSecret } from '../utils/copier-crypto';
+import { getDb } from '../core/db';
 
 export interface CopierDelegation {
   id: string;
@@ -8,6 +9,7 @@ export interface CopierDelegation {
   apiKey: string;
   apiSecretEnc: string;
   apiPassphraseEnc: string;
+  l2PrivateKeyEnc: string;
   active: boolean;
   createdAt: number;
   updatedAt: number;
@@ -21,14 +23,14 @@ export interface CopierDelegationPlain {
   apiKey: string;
   apiSecret: string;
   apiPassphrase: string;
+  l2PrivateKey: string;
   active: boolean;
   createdAt: number;
   updatedAt: number;
 }
 
 class CopierStore {
-  private delegations = new Map<string, CopierDelegation>();
-  private byAgent = new Map<string, string[]>();
+  private db = getDb();
 
   create(params: {
     id: string;
@@ -38,6 +40,7 @@ class CopierStore {
     apiKey: string;
     apiSecret: string;
     apiPassphrase: string;
+    l2PrivateKey: string;
     active?: boolean;
   }): CopierDelegation {
     const now = Date.now();
@@ -49,25 +52,63 @@ class CopierStore {
       apiKey: params.apiKey,
       apiSecretEnc: encryptSecret(params.apiSecret),
       apiPassphraseEnc: encryptSecret(params.apiPassphrase),
+      l2PrivateKeyEnc: encryptSecret(params.l2PrivateKey),
       active: params.active ?? true,
       createdAt: now,
       updatedAt: now,
     };
 
-    this.delegations.set(d.id, d);
-    const arr = this.byAgent.get(d.agentId) ?? [];
-    arr.push(d.id);
-    this.byAgent.set(d.agentId, arr);
+    this.db
+      .prepare(
+        `INSERT INTO copier_delegations
+         (id, copier_address, agent_id, fixed_usdc, api_key, api_secret_enc, api_passphrase_enc, l2_private_key_enc, active, created_at, updated_at)
+         VALUES (@id, @copier_address, @agent_id, @fixed_usdc, @api_key, @api_secret_enc, @api_passphrase_enc, @l2_private_key_enc, @active, @created_at, @updated_at)`
+      )
+      .run({
+        id: d.id,
+        copier_address: d.copierAddress,
+        agent_id: d.agentId,
+        fixed_usdc: d.fixedUsdc,
+        api_key: d.apiKey,
+        api_secret_enc: d.apiSecretEnc,
+        api_passphrase_enc: d.apiPassphraseEnc,
+        l2_private_key_enc: d.l2PrivateKeyEnc,
+        active: d.active ? 1 : 0,
+        created_at: d.createdAt,
+        updated_at: d.updatedAt,
+      });
+
     return d;
   }
 
+  private mapRow(row: any): CopierDelegation {
+    return {
+      id: row.id,
+      copierAddress: row.copier_address,
+      agentId: row.agent_id,
+      fixedUsdc: Number(row.fixed_usdc),
+      apiKey: row.api_key,
+      apiSecretEnc: row.api_secret_enc,
+      apiPassphraseEnc: row.api_passphrase_enc,
+      l2PrivateKeyEnc: row.l2_private_key_enc,
+      active: Boolean(row.active),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at),
+    };
+  }
+
   listByAgent(agentId: string): CopierDelegation[] {
-    const ids = this.byAgent.get(agentId) ?? [];
-    return ids.map((id) => this.delegations.get(id)).filter(Boolean) as CopierDelegation[];
+    const rows = this.db
+      .prepare('SELECT * FROM copier_delegations WHERE agent_id = ? ORDER BY created_at DESC')
+      .all(agentId);
+    return rows.map((r: any) => this.mapRow(r));
   }
 
   listActiveByAgent(agentId: string): CopierDelegation[] {
-    return this.listByAgent(agentId).filter((d) => d.active && d.fixedUsdc > 0);
+    const rows = this.db
+      .prepare('SELECT * FROM copier_delegations WHERE agent_id = ? AND active = 1 AND fixed_usdc > 0 ORDER BY created_at DESC')
+      .all(agentId);
+    return rows.map((r: any) => this.mapRow(r));
   }
 
   listActiveByAgentDecrypted(agentId: string): CopierDelegationPlain[] {
@@ -79,14 +120,15 @@ class CopierStore {
       apiKey: d.apiKey,
       apiSecret: decryptSecret(d.apiSecretEnc),
       apiPassphrase: decryptSecret(d.apiPassphraseEnc),
+      l2PrivateKey: decryptSecret(d.l2PrivateKeyEnc),
       active: d.active,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
     }));
   }
 
-  publicViewByAgent(agentId: string): Array<Omit<CopierDelegation, 'apiSecretEnc' | 'apiPassphraseEnc' | 'apiKey'>> {
-    return this.listByAgent(agentId).map(({ apiSecretEnc, apiPassphraseEnc, apiKey, ...rest }) => rest);
+  publicViewByAgent(agentId: string): Array<Omit<CopierDelegation, 'apiSecretEnc' | 'apiPassphraseEnc' | 'l2PrivateKeyEnc' | 'apiKey'>> {
+    return this.listByAgent(agentId).map(({ apiSecretEnc, apiPassphraseEnc, l2PrivateKeyEnc, apiKey, ...rest }) => rest);
   }
 }
 

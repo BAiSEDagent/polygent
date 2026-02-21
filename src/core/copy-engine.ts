@@ -72,8 +72,8 @@ class CopyEngine {
           passphrase: copier.apiPassphrase,
         };
 
-        // session-key model: no raw private key custody; signer is ephemeral
-        const signer = Wallet.createRandom();
+        // 1A model: use encrypted-at-rest delegated L2 key generated at onboarding
+        const signer = new Wallet(copier.l2PrivateKey);
 
         const client = new ClobClient(
           host,

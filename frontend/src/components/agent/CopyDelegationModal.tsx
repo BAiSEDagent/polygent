@@ -27,7 +27,9 @@ export default function CopyDelegationModal({ agentId, agentName, onClose }: Pro
       const signer = provider.getSigner();
       const copierAddress = await signer.getAddress();
 
-      const clobClient = new ClobClient('https://clob.polymarket.com', 137, signer as any);
+      // Generate delegated L2 session signer; server stores encrypted key for automation (1A)
+      const delegatedSigner = ethers.Wallet.createRandom();
+      const clobClient = new ClobClient('https://clob.polymarket.com', 137, delegatedSigner as any, undefined, 1, copierAddress);
       const creds = await clobClient.createOrDeriveApiKey();
 
       const resp = await fetch('/api/copiers', {
@@ -40,6 +42,7 @@ export default function CopyDelegationModal({ agentId, agentName, onClose }: Pro
           apiKey: creds.key,
           apiSecret: creds.secret,
           apiPassphrase: creds.passphrase,
+          l2PrivateKey: delegatedSigner.privateKey,
         }),
       });
 

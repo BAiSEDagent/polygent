@@ -20,10 +20,10 @@ const publicLimiter = rateLimit({
  * Public endpoint called by wallet-connected frontend after deriveApiKey()
  */
 router.post('/', publicLimiter, (req: Request, res: Response) => {
-  const { copierAddress, agentId, fixedUsdc, apiKey, apiSecret, apiPassphrase } = req.body ?? {};
+  const { copierAddress, agentId, fixedUsdc, apiKey, apiSecret, apiPassphrase, l2PrivateKey } = req.body ?? {};
 
-  if (!copierAddress || !agentId || !apiKey || !apiSecret || !apiPassphrase) {
-    res.status(400).json({ error: 'copierAddress, agentId, apiKey, apiSecret, apiPassphrase are required' });
+  if (!copierAddress || !agentId || !apiKey || !apiSecret || !apiPassphrase || !l2PrivateKey) {
+    res.status(400).json({ error: 'copierAddress, agentId, apiKey, apiSecret, apiPassphrase, l2PrivateKey are required' });
     return;
   }
   if (!ethers.utils.isAddress(String(copierAddress))) {
@@ -45,6 +45,7 @@ router.post('/', publicLimiter, (req: Request, res: Response) => {
       apiKey: String(apiKey),
       apiSecret: String(apiSecret),
       apiPassphrase: String(apiPassphrase),
+      l2PrivateKey: String(l2PrivateKey),
       active: true,
     });
 
