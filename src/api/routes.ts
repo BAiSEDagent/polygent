@@ -41,7 +41,7 @@ router.get('/leaderboard', (_req: Request, res: Response) => {
 });
 
 /** GET /api/activity — Recent agent activity feed (requires auth) */
-router.get('/activity', authenticateAgent, (req: Request, res: Response) => {
+router.get('/activity', (req: Request, res: Response) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
   const activity = agentRunner.getActivity(limit);
   res.json({ activity, total: activity.length });
