@@ -12,10 +12,12 @@ type Props = {
 export default function CopyDelegationModal({ agentId, agentName, onClose }: Props) {
   const [allocation, setAllocation] = useState<number>(50);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [deployStatus, setDeployStatus] = useState<'signing' | 'deploying'>('signing');
   const [error, setError] = useState<string>('');
 
   const handleDeploy = async () => {
     setError('');
+    setDeployStatus('signing');
     setStep(2);
 
     try {
@@ -30,6 +32,9 @@ export default function CopyDelegationModal({ agentId, agentName, onClose }: Pro
       // Use user's wallet to authorize API credentials with CLOB
       const clobClient = new ClobClient('https://clob.polymarket.com', 137, signer as any, undefined, 1, copierAddress);
       const creds = await clobClient.createOrDeriveApiKey();
+
+      // Signature complete, now deploying
+      setDeployStatus('deploying');
 
       // Generate delegated L2 session signer for server-side automation (1A)
       const delegatedSigner = ethers.Wallet.createRandom();
@@ -61,8 +66,8 @@ export default function CopyDelegationModal({ agentId, agentName, onClose }: Pro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-md border border-[#1f1f22] bg-[#050505] rounded-sm shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md border border-[#1f1f22] bg-[#050505] rounded-sm shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-[#1f1f22] bg-[linear-gradient(to_right,#1f1f22_1px,transparent_1px),linear-gradient(to_bottom,#1f1f22_1px,transparent_1px)] bg-[size:20px_20px]">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-blue-500" />
@@ -89,7 +94,10 @@ export default function CopyDelegationModal({ agentId, agentName, onClose }: Pro
                 {[10, 25, 50, 100].map((val) => (
                   <button
                     key={val}
-                    onClick={() => setAllocation(val)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAllocation(val);
+                    }}
                     className={`py-2 font-mono text-xs border rounded-sm transition-all ${
                       allocation === val
                         ? 'bg-blue-500/10 border-blue-500 text-blue-400'
@@ -129,8 +137,12 @@ export default function CopyDelegationModal({ agentId, agentName, onClose }: Pro
               <Terminal className="relative w-6 h-6 text-blue-500" />
             </div>
             <div className="text-center space-y-1">
-              <div className="font-mono font-bold text-white">Awaiting Signature</div>
-              <div className="font-mono text-xs text-zinc-500">Please check your wallet...</div>
+              <div className="font-mono font-bold text-white">
+                {deployStatus === 'signing' ? 'Awaiting Signature' : 'DEPLOYING...'}
+              </div>
+              <div className="font-mono text-xs text-zinc-500">
+                {deployStatus === 'signing' ? 'Please check your wallet...' : 'Activating copy engine...'}
+              </div>
             </div>
           </div>
         )}
