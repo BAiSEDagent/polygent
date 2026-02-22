@@ -18,7 +18,6 @@ interface LiveTraderConfig {
   clobApiKey: string;
   clobSecret: string;
   clobPassphrase: string;
-  funderAddress: string;
   chainId: number;
   host: string;
   builderApiKey?: string;
@@ -73,14 +72,14 @@ export class LiveTrader {
       cfg.chainId,
       signer,
       creds,
-      1,    // POLY_PROXY signature type
-      cfg.funderAddress,
+      0,    // EOA signature type (direct wallet signing)
+      undefined, // No funder — signer is maker
       undefined,
       false,
       builderConfig
     );
 
-    logger.info(`LiveTrader initialized — signer: ${signer.address}, funder: ${cfg.funderAddress}`);
+    logger.info(`LiveTrader initialized — signer: ${signer.address} (EOA mode)`);
     logger.info(`Limits: $${cfg.maxOrderSize}/order, $${cfg.maxTotalExposure} total`);
   }
 
@@ -160,12 +159,24 @@ export class LiveTrader {
         }
       );
 
-      // Update tracking
+      // CRITICAL: Check for API errors that don't throw exceptions
+      if ((result as any)?.error) {
+        const errMsg = (result as any).error;
+        logger.error(`❌ Order failed (API error): ${errMsg}`);
+        return { success: false, error: errMsg, tokenId, side, price, size };
+      }
+
+      const orderId = result?.orderID || result?.id;
+      if (!orderId) {
+        logger.error(`❌ Order failed: No orderID in response`);
+        return { success: false, error: 'No orderID returned', tokenId, side, price, size };
+      }
+
+      // Only update tracking on confirmed success
       this.totalExposure += orderValue;
       this.orderCount++;
       this.dailyOrderCount++;
 
-      const orderId = result?.orderID || result?.id || 'unknown';
       logger.info(`✅ LIVE ORDER PLACED: ${orderId} — ${side} ${size} @ ${price} ($${orderValue.toFixed(2)})`);
       logger.info(`Exposure: $${this.totalExposure.toFixed(2)}/${this.config.maxTotalExposure} | Orders today: ${this.dailyOrderCount}`);
 
@@ -228,7 +239,6 @@ export function initLiveTrader(): LiveTrader {
     clobApiKey: process.env.CLOB_API_KEY || '',
     clobSecret: process.env.CLOB_SECRET || '',
     clobPassphrase: process.env.CLOB_PASSPHRASE || '',
-    funderAddress: process.env.FUNDER_ADDRESS || '',
     chainId: Number(process.env.CHAIN_ID || 137),
     host: 'https://clob.polymarket.com',
     builderApiKey: process.env.BUILDER_API_KEY,
