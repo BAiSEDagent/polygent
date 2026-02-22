@@ -2,18 +2,27 @@
   "version": 2,
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "rewrites": [
+  "framework": null,
+  "installCommand": "cd frontend && npm install",
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "http://72.61.138.205:3000/api/$1"
+      "src": "/api/(.*)",
+      "dest": "http://72.61.138.205:3000/api/$1"
     },
     {
-      "source": "/health",
-      "destination": "http://72.61.138.205:3000/health"
+      "src": "/health",
+      "dest": "http://72.61.138.205:3000/health"
     },
     {
-      "source": "/ws/(.*)",
-      "destination": "http://72.61.138.205:3000/ws/$1"
+      "src": "/ws/(.*)",
+      "dest": "http://72.61.138.205:3000/ws/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
