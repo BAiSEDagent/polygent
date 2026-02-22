@@ -1,5 +1,5 @@
 /**
- * SQLite persistence layer for agents, orders, and trades.
+ * SQLite persistence layer for agents, orders, trades, and paper trades.
  *
  * Uses better-sqlite3 for synchronous, zero-dependency persistence.
  * Falls back to in-memory if the file can't be opened (e.g., read-only FS).
@@ -8,6 +8,23 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { logger } from '../utils/logger';
+
+// Inline type to avoid circular dependency with paper-trader.ts
+export interface PersistedPaperTrade {
+  id: string;
+  agentId: string;
+  strategyName: string;
+  marketId: string;
+  side: 'BUY' | 'SELL';
+  outcome: 'YES' | 'NO';
+  requestedPrice: number;
+  executedPrice: number;
+  amount: number;
+  notional: number;
+  reasoning: string;
+  slippage: number;
+  timestamp: number;
+}
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'polygent.db');
 
@@ -114,9 +131,118 @@ function migrate(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_copier_agent ON copier_delegations(agent_id);
     CREATE INDEX IF NOT EXISTS idx_copier_active ON copier_delegations(active);
+
+    -- Paper trades: no FK constraints so system agents don't need to be in the
+    -- agents table. This table is the single source of truth for paper PnL.
+    CREATE TABLE IF NOT EXISTS paper_trades (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      agent_name TEXT NOT NULL,
+      strategy_name TEXT NOT NULL,
+      market_id TEXT NOT NULL,
+      market_question TEXT,
+      side TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      requested_price REAL NOT NULL,
+      executed_price REAL NOT NULL,
+      amount REAL NOT NULL,
+      notional REAL NOT NULL,
+      reasoning TEXT,
+      slippage REAL NOT NULL DEFAULT 0,
+      timestamp INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_paper_agent ON paper_trades(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_paper_timestamp ON paper_trades(timestamp);
   `);
 
   logger.info('Database migrations applied');
+}
+
+// ─── Paper Trade Persistence ─────────────────────────────────────────────────
+
+/**
+ * Persist a paper trade to SQLite.
+ * Called synchronously after every paper trade execution.
+ */
+export function insertPaperTrade(
+  trade: PersistedPaperTrade,
+  agentName: string,
+  marketQuestion?: string
+): void {
+  const db = getDb();
+  try {
+    db.prepare(`
+      INSERT OR IGNORE INTO paper_trades (
+        id, agent_id, agent_name, strategy_name,
+        market_id, market_question,
+        side, outcome,
+        requested_price, executed_price,
+        amount, notional, reasoning, slippage, timestamp
+      ) VALUES (
+        @id, @agentId, @agentName, @strategyName,
+        @marketId, @marketQuestion,
+        @side, @outcome,
+        @requestedPrice, @executedPrice,
+        @amount, @notional, @reasoning, @slippage, @timestamp
+      )
+    `).run({
+      id: trade.id,
+      agentId: trade.agentId,
+      agentName,
+      strategyName: trade.strategyName,
+      marketId: trade.marketId,
+      marketQuestion: marketQuestion ?? null,
+      side: trade.side,
+      outcome: trade.outcome,
+      requestedPrice: trade.requestedPrice,
+      executedPrice: trade.executedPrice,
+      amount: trade.amount,
+      notional: trade.notional,
+      reasoning: trade.reasoning ?? null,
+      slippage: trade.slippage,
+      timestamp: trade.timestamp,
+    });
+  } catch (err) {
+    logger.warn('Failed to persist paper trade to SQLite', {
+      id: trade.id,
+      error: (err as Error).message,
+    });
+  }
+}
+
+/**
+ * Load all persisted paper trades from SQLite, sorted oldest→newest.
+ * Used on startup to restore in-memory state.
+ */
+export function loadPaperTrades(): PersistedPaperTrade[] {
+  const db = getDb();
+  try {
+    const rows = db.prepare(`
+      SELECT * FROM paper_trades ORDER BY timestamp ASC
+    `).all() as any[];
+
+    return rows.map(r => ({
+      id: r.id,
+      agentId: r.agent_id,
+      strategyName: r.strategy_name,
+      marketId: r.market_id,
+      side: r.side as 'BUY' | 'SELL',
+      outcome: r.outcome as 'YES' | 'NO',
+      requestedPrice: r.requested_price,
+      executedPrice: r.executed_price,
+      amount: r.amount,
+      notional: r.notional,
+      reasoning: r.reasoning ?? '',
+      slippage: r.slippage,
+      timestamp: r.timestamp,
+    }));
+  } catch (err) {
+    logger.warn('Failed to load paper trades from SQLite', {
+      error: (err as Error).message,
+    });
+    return [];
+  }
 }
 
 export function closeDb(): void {

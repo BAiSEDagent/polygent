@@ -72,7 +72,7 @@ class AgentRunner extends EventEmitter {
       walletAddress: '0x0000000000000000000000000000000000000000',
       deposit: options?.deposit ?? 10_000, // $10K paper money
       configOverrides: {
-        maxOrderSize: 500,
+        maxOrderSize: 100, // Capped — paper-trader enforces $75 hard limit per trade
         maxPositionPct: 0.15,
         maxDrawdownPct: 0.25,
         dailyLossLimitPct: 0.10,
@@ -96,6 +96,9 @@ class AgentRunner extends EventEmitter {
       deposit: agent.equity.deposited,
       interval: `${(options?.intervalMs ?? this.DEFAULT_INTERVAL_MS) / 1000}s`,
     });
+
+    // Restore equity from persisted paper trade history (survives restarts)
+    paperTrader.restoreAgentEquity(agent.id, name);
 
     return agent;
   }

@@ -7,6 +7,7 @@ import { tradeStore } from '../models/trade';
 import { broadcastTrade } from './data-feed';
 import { Agent, Signal, Trade, Order, OrderRequest } from '../utils/types';
 import { getAgentMutex } from '../utils/mutex';
+import { insertPaperTrade, loadPaperTrades, PersistedPaperTrade } from './db';
 
 /**
  * Paper Trading Engine
@@ -14,6 +15,9 @@ import { getAgentMutex } from '../utils/mutex';
  * Simulates order execution against live orderbook data.
  * Tracks virtual positions, P&L, and trade history per agent.
  * Uses the same risk engine as real trading.
+ *
+ * Persistence: every paper trade is written to SQLite immediately.
+ * On startup, existing trades are loaded to restore leaderboard PnL.
  */
 
 export interface PaperTrade {
@@ -45,13 +49,67 @@ export interface AgentPerformance {
   maxDrawdown: number;
   currentEquity: number;
   depositedEquity: number;
+  lastTradeAt: number | null;
 }
 
+// Hard cap on paper trade size — prevents $500 blowouts on $10k bankroll.
+// Agents should build track record with small, consistent bets.
+const PAPER_MAX_SIZE = 75;
 const MAX_PAPER_TRADES = 50_000;
 
 class PaperTradingEngine {
   private paperTrades: PaperTrade[] = [];
   private equityHistory = new Map<string, Array<{ equity: number; timestamp: number }>>();
+
+  constructor() {
+    // Restore paper trades from SQLite on startup.
+    // This ensures leaderboard PnL survives VPS restarts.
+    this.restoreFromDb();
+  }
+
+  /**
+   * Load persisted paper trades from SQLite and restore in-memory state.
+   * Equity is recalculated from trade history so leaderboard PnL is accurate.
+   */
+  private restoreFromDb(): void {
+    try {
+      const rows = loadPaperTrades();
+      if (rows.length === 0) return;
+
+      this.paperTrades = rows.map(r => ({ ...r }));
+      logger.info(`📀 Restored ${rows.length} paper trades from SQLite`);
+
+      // Recalculate per-agent equity delta from trade history.
+      // We apply the delta once agents are registered (agentStore may be empty here).
+      // The runner calls restoreAgentEquity() after registration.
+    } catch (err) {
+      logger.warn('Failed to restore paper trades from SQLite', {
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  /**
+   * Recalculate and restore equity for a registered agent based on its trade history.
+   * Called by AgentRunner after each agent is registered.
+   */
+  restoreAgentEquity(agentId: string, agentName: string): void {
+    const agent = agentStore.get(agentId);
+    if (!agent) return;
+
+    const agentTrades = this.paperTrades.filter(t => t.agentId === agentId);
+    if (agentTrades.length === 0) return;
+
+    // Replay trade history to get correct equity
+    let equity = agent.equity.deposited;
+    for (const trade of agentTrades.sort((a, b) => a.timestamp - b.timestamp)) {
+      const costBasis = trade.amount * trade.executedPrice;
+      equity = trade.side === 'BUY' ? equity - costBasis : equity + costBasis;
+    }
+
+    agentStore.updateEquity(agentId, equity);
+    logger.info(`📊 Restored equity for ${agentName}: $${equity.toFixed(2)} from ${agentTrades.length} trades`);
+  }
 
   /**
    * Execute a signal as a paper trade.
@@ -68,12 +126,15 @@ class PaperTradingEngine {
   }
 
   private async _executeSignalInner(signal: Signal, agent: Agent): Promise<PaperTrade | null> {
+    // Cap trade size — prevents single trades from blowing out the daily loss limit.
+    const cappedSize = Math.min(signal.suggestedSize, PAPER_MAX_SIZE);
+
     // Build order request from signal
     const orderRequest: OrderRequest = {
       marketId: signal.marketId,
       side: signal.direction,
       outcome: signal.outcome,
-      amount: signal.suggestedSize,
+      amount: cappedSize,
       price: signal.suggestedPrice,
       type: 'LIMIT',
     };
@@ -93,7 +154,7 @@ class PaperTradingEngine {
     // Simulate execution against live orderbook
     const executedPrice = await this.simulateExecution(signal);
     const slippage = Math.abs(executedPrice - signal.suggestedPrice);
-    const notional = signal.suggestedSize * executedPrice;
+    const notional = cappedSize * executedPrice;
 
     // Create paper trade record
     const paperTrade: PaperTrade = {
@@ -105,7 +166,7 @@ class PaperTradingEngine {
       outcome: signal.outcome,
       requestedPrice: signal.suggestedPrice,
       executedPrice,
-      amount: signal.suggestedSize,
+      amount: cappedSize,
       notional,
       reasoning: signal.reasoning,
       timestamp: Date.now(),
@@ -117,7 +178,11 @@ class PaperTradingEngine {
       this.paperTrades = this.paperTrades.slice(-MAX_PAPER_TRADES);
     }
 
-    // Also record in the main trade store (for portfolio tracking)
+    // Persist to SQLite immediately — survives restarts.
+    const market = liveDataService.getMarket(signal.marketId);
+    insertPaperTrade(paperTrade as PersistedPaperTrade, agent.name, market?.question);
+
+    // Also record in the main trade store (for portfolio/risk tracking)
     const trade: Trade = {
       id: paperTrade.id,
       orderId: `paper_${paperTrade.id}`,
@@ -125,25 +190,25 @@ class PaperTradingEngine {
       marketId: signal.marketId,
       side: signal.direction,
       outcome: signal.outcome,
-      amount: signal.suggestedSize,
+      amount: cappedSize,
       price: executedPrice,
       source: 'paper',
       timestamp: Date.now(),
     };
     tradeStore.addTrade(trade);
 
-    // Record an order too
+    // Record a synthetic order for position tracking
     const order: Order = {
       id: trade.orderId,
       agentId: agent.id,
       marketId: signal.marketId,
       side: signal.direction,
       outcome: signal.outcome,
-      amount: signal.suggestedSize,
+      amount: cappedSize,
       price: executedPrice,
       type: 'LIMIT',
       status: 'filled',
-      filledAmount: signal.suggestedSize,
+      filledAmount: cappedSize,
       clobOrderId: null,
       source: 'paper',
       createdAt: Date.now(),
@@ -154,13 +219,13 @@ class PaperTradingEngine {
     // Update agent equity
     this.updateAgentEquity(agent, paperTrade);
 
-    // Broadcast for dashboard
+    // Broadcast for dashboard WebSocket feed
     broadcastTrade({
       agentId: agent.id,
       marketId: signal.marketId,
       side: signal.direction,
       outcome: signal.outcome,
-      amount: signal.suggestedSize,
+      amount: cappedSize,
       price: executedPrice,
     });
 
@@ -172,7 +237,7 @@ class PaperTradingEngine {
       side: signal.direction,
       outcome: signal.outcome,
       price: executedPrice.toFixed(4),
-      amount: signal.suggestedSize.toFixed(2),
+      amount: cappedSize.toFixed(2),
       reasoning: signal.reasoning.slice(0, 100),
     });
 
@@ -199,11 +264,10 @@ class PaperTradingEngine {
     const trades = this.getAgentTrades(agent.id, 1000);
     const positions = tradeStore.getAgentPositions(agent.id);
 
-    // Calculate realized P&L from closed positions and unrealized from open
+    // Calculate win/loss from open positions vs current market price
     let winningTrades = 0;
     let losingTrades = 0;
 
-    // Simple heuristic: compare entry price to current market price
     for (const pos of positions) {
       const market = liveDataService.getMarket(pos.marketId);
       if (market) {
@@ -220,9 +284,11 @@ class PaperTradingEngine {
     const totalPnl = agent.equity.current - agent.equity.deposited;
     const totalPnlPct = agent.equity.deposited > 0 ? totalPnl / agent.equity.deposited : 0;
 
-    // Sharpe ratio from equity history
     const sharpeRatio = this.calculateSharpe(agent.id);
     const maxDrawdown = this.calculateMaxDrawdown(agent.id);
+
+    // Last trade timestamp — proof of life
+    const lastTradeAt = trades.length > 0 ? trades[0].timestamp : null;
 
     return {
       agentId: agent.id,
@@ -237,6 +303,7 @@ class PaperTradingEngine {
       maxDrawdown,
       currentEquity: agent.equity.current,
       depositedEquity: agent.equity.deposited,
+      lastTradeAt,
     };
   }
 
@@ -252,7 +319,6 @@ class PaperTradingEngine {
   // ─── Internal ────────────────────────────────────────────────────────────
 
   private async simulateExecution(signal: Signal): Promise<number> {
-    // Try to get live orderbook for realistic execution price
     try {
       const orderbook = await liveDataService.getOrderBook(signal.marketId);
       if (orderbook) {
@@ -263,7 +329,7 @@ class PaperTradingEngine {
     }
 
     // Fallback: simulate with small slippage
-    const slippageBps = Math.random() * 50; // 0-50 bps random slippage
+    const slippageBps = Math.random() * 50; // 0-50 bps
     const slippage = signal.suggestedPrice * (slippageBps / 10_000);
     const direction = signal.direction === 'BUY' ? 1 : -1;
     return Math.max(0.001, Math.min(0.999, signal.suggestedPrice + slippage * direction));
@@ -273,7 +339,6 @@ class PaperTradingEngine {
     const levels = signal.direction === 'BUY' ? orderbook.asks : orderbook.bids;
     if (levels.length === 0) return signal.suggestedPrice;
 
-    // Walk the book to simulate fill
     let remaining = signal.suggestedSize;
     let totalCost = 0;
 
@@ -284,7 +349,6 @@ class PaperTradingEngine {
       if (remaining <= 0) break;
     }
 
-    // If we couldn't fill entirely, use worst level
     if (remaining > 0) {
       const worstPrice = levels[levels.length - 1]?.price ?? signal.suggestedPrice;
       totalCost += remaining * worstPrice;
@@ -294,21 +358,15 @@ class PaperTradingEngine {
   }
 
   private updateAgentEquity(agent: Agent, trade: PaperTrade): void {
-    // For paper trading, equity changes based on mark-to-market of positions
-    // Simple model: deduct cost basis on buy, credit on sell
     const costBasis = trade.amount * trade.executedPrice;
 
     if (trade.side === 'BUY') {
-      // Buying outcome tokens costs USDC
-      const newEquity = agent.equity.current - costBasis;
-      agentStore.updateEquity(agent.id, newEquity);
+      agentStore.updateEquity(agent.id, agent.equity.current - costBasis);
     } else {
-      // Selling outcome tokens returns USDC
-      const newEquity = agent.equity.current + costBasis;
-      agentStore.updateEquity(agent.id, newEquity);
+      agentStore.updateEquity(agent.id, agent.equity.current + costBasis);
     }
 
-    // Track equity history for Sharpe/drawdown calculations
+    // Track equity curve for Sharpe/drawdown
     const history = this.equityHistory.get(agent.id) ?? [];
     history.push({ equity: agent.equity.current, timestamp: Date.now() });
     if (history.length > 1000) history.shift();
@@ -319,7 +377,6 @@ class PaperTradingEngine {
     const history = this.equityHistory.get(agentId);
     if (!history || history.length < 3) return 0;
 
-    // Calculate returns
     const returns: number[] = [];
     for (let i = 1; i < history.length; i++) {
       const ret = (history[i].equity - history[i - 1].equity) / history[i - 1].equity;
@@ -331,9 +388,7 @@ class PaperTradingEngine {
     const stddev = Math.sqrt(variance);
 
     if (stddev === 0) return 0;
-
-    // Annualized (assume 5min intervals, ~105120 intervals/year)
-    return (mean / stddev) * Math.sqrt(105120);
+    return (mean / stddev) * Math.sqrt(105120); // Annualized
   }
 
   private calculateMaxDrawdown(agentId: string): number {

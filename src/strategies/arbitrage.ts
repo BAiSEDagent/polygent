@@ -4,66 +4,84 @@ import { liveDataService } from '../core/live-data';
 import { logger } from '../utils/logger';
 
 /**
- * Arbitrage Strategy
+ * Arbitrage Strategy — Integrity Edition
  *
- * Two modes:
- * 1. **Spread Arbitrage**: YES + NO price sum < 0.98 → buy both for guaranteed profit
- * 2. **Cross-Market Arbitrage**: Detect correlated/identical markets with price divergence
+ * Two modes only:
  *
- * This is the safest strategy — near risk-free when spreads are found.
- * In practice, spreads are rare and small on Polymarket (efficient market),
- * but the strategy serves as a constant scanner.
+ * 1. SPREAD ARBITRAGE (true risk-free)
+ *    YES + NO price sum < 1.0 − MIN_SPREAD. Guaranteed profit.
+ *    Rare on efficient markets but real when found.
+ *
+ * 2. DUPLICATE MARKET ARBITRAGE (same event, two listings)
+ *    Detects the SAME question listed twice with different prices.
+ *    Requires ALL of:
+ *      a) Question similarity ≥ 0.92 (near-identical text)
+ *      b) Same category
+ *      c) Matching threshold numbers (within 5%) — eliminates
+ *         "London 12°C vs 13°C" and "ETH $1800 vs ETH $2000"
+ *
+ * INTENTIONALLY EXCLUDED:
+ *   - "Correlated" markets with different thresholds or different subjects.
+ *     These are not arbitrage — they are speculation.
+ *   - Weather markets at different temperatures are independent events.
+ *   - Price markets at different thresholds have different expected values.
  */
 
-interface ArbitrageOpportunity {
-  type: 'spread' | 'cross_market';
-  marketId: string;
-  yesPrice: number;
-  noPrice: number;
-  totalPrice: number;
-  spread: number;
-  relatedMarketId?: string;
-  relatedPrice?: number;
+interface IndexedMarket {
+  id: string;
+  question: string;
+  category: string;
+  prices: number[];
 }
 
 export class ArbitrageStrategy extends BaseStrategy {
   readonly name = 'arbitrage';
-  readonly description = 'Exploit YES+NO pricing inefficiencies for risk-free profit';
-  readonly version = '1.0.0';
+  readonly description = 'Spread arb + duplicate-market detection. No false correlations.';
+  readonly version = '2.0.0';
 
-  private readonly MIN_SPREAD = 0.01;        // 2% minimum spread to trigger
-  private readonly CROSS_MARKET_THRESHOLD = 0.03; // 5% price divergence for cross-market
-  private seenOpportunities = new Set<string>(); // Dedup within session
-  private questionIndex = new Map<string, Array<{ id: string; question: string; prices: number[] }>>();
+  // Spread arb: YES + NO must be < 1.0 − MIN_SPREAD to trigger
+  private readonly MIN_SPREAD = 0.02;
+
+  // Duplicate market arb: minimum price divergence between identical markets
+  private readonly DUPLICATE_MIN_DIVERGENCE = 0.05;
+
+  // Duplicate detection gates (all must pass)
+  private readonly SIMILARITY_THRESHOLD = 0.92;   // Near-identical questions only
+  private readonly NUMBER_TOLERANCE = 0.05;        // Numbers must match within 5%
+
+  private seenOpportunities = new Set<string>();
+  // marketIndex: normalizedQuestion → list of indexed markets with same text
+  private marketIndex = new Map<string, IndexedMarket[]>();
 
   async analyze(market: Market, context: StrategyContext): Promise<Signal | null> {
     if (market.outcomePrices.length < 2) return null;
 
     const yesPrice = market.outcomePrices[0];
-    const noPrice = market.outcomePrices[1];
+    const noPrice  = market.outcomePrices[1];
 
-    // Index for cross-market detection
+    // Update our market index
     this.indexMarket(market);
 
-    // 1. Spread arbitrage: YES + NO < 1.00
+    // 1. Spread arb (true risk-free)
     const spreadSignal = this.checkSpreadArbitrage(market, yesPrice, noPrice, context);
     if (spreadSignal) return spreadSignal;
 
-    // 2. Cross-market arbitrage
-    const crossSignal = this.checkCrossMarketArbitrage(market, yesPrice, context);
-    if (crossSignal) return crossSignal;
+    // 2. Duplicate market arb (same question, two prices)
+    const dupSignal = this.checkDuplicateMarketArbitrage(market, yesPrice, context);
+    if (dupSignal) return dupSignal;
 
     return null;
   }
+
+  // ─── Spread Arbitrage ─────────────────────────────────────────────────────
 
   private checkSpreadArbitrage(
     market: Market,
     yesPrice: number,
     noPrice: number,
-    context: StrategyContext
+    context: StrategyContext,
   ): Signal | null {
     const totalPrice = yesPrice + noPrice;
-
     if (totalPrice >= 1.0 - this.MIN_SPREAD) return null;
 
     const spread = 1.0 - totalPrice;
@@ -71,137 +89,191 @@ export class ArbitrageStrategy extends BaseStrategy {
     if (this.seenOpportunities.has(dedupKey)) return null;
     this.seenOpportunities.add(dedupKey);
 
-    // Clean up old dedup entries periodically
-    if (this.seenOpportunities.size > 1000) {
-      this.seenOpportunities.clear();
-    }
+    if (this.seenOpportunities.size > 1000) this.seenOpportunities.clear();
 
-    // Size based on guaranteed profit
     const size = this.kellySize(0.99, 1 / spread, context.agent.equity.current, 0.5);
     if (size < 1) return null;
 
-    // Buy the cheaper side
     const outcome = yesPrice <= noPrice ? 'YES' as const : 'NO' as const;
-    const price = outcome === 'YES' ? yesPrice : noPrice;
-
+    const price   = outcome === 'YES' ? yesPrice : noPrice;
     const confidence = Math.min(0.95, 0.7 + spread * 3);
 
-    logger.info(`💰 Spread arbitrage found`, {
-      market: market.question.slice(0, 60),
-      yes: yesPrice.toFixed(4),
-      no: noPrice.toFixed(4),
-      total: totalPrice.toFixed(4),
-      spread: (spread * 100).toFixed(2) + '%',
-    });
+    logger.info(`💰 Spread arb: ${market.question.slice(0, 50)} | YES+NO=${totalPrice.toFixed(4)} | spread=${(spread * 100).toFixed(2)}%`);
 
     return this.createSignal(market.id, {
-      tokenId: market.tokenIds?.[0],
-      negRisk: market.negRisk,
-      direction: 'BUY',
+      tokenId:       market.tokenIds?.[0],
+      negRisk:       market.negRisk,
+      direction:     'BUY',
       outcome,
       confidence,
       suggestedPrice: price,
-      suggestedSize: size,
-      reasoning: `💰 Spread Arb: YES($${yesPrice.toFixed(4)}) + NO($${noPrice.toFixed(4)}) = $${totalPrice.toFixed(4)}. Guaranteed ${(spread * 100).toFixed(2)}% profit. Buying ${outcome} at $${price.toFixed(4)}.`,
+      suggestedSize:  size,
+      reasoning: `💰 Spread Arb: YES(${yesPrice.toFixed(4)}) + NO(${noPrice.toFixed(4)}) = ${totalPrice.toFixed(4)}. Guaranteed ${(spread * 100).toFixed(2)}% profit.`,
     });
   }
 
-  private checkCrossMarketArbitrage(
+  // ─── Duplicate Market Arbitrage ───────────────────────────────────────────
+
+  /**
+   * Detects the same question listed twice on Polymarket with different prices.
+   *
+   * Valid pair must pass ALL gates:
+   *   1. Question similarity ≥ 0.92
+   *   2. Same category
+   *   3. All numeric thresholds in both questions match within 5%
+   *   4. Price divergence ≥ DUPLICATE_MIN_DIVERGENCE
+   */
+  private checkDuplicateMarketArbitrage(
     market: Market,
     yesPrice: number,
-    context: StrategyContext
+    context: StrategyContext,
   ): Signal | null {
-    // Normalize question for matching
-    const normalized = this.normalizeQuestion(market.question);
+    const normalized    = this.normalize(market.question);
+    const marketNumbers = this.extractNumbers(market.question);
+    const marketCat     = (market.category || '').toLowerCase().trim();
 
-    // Find similar markets
-    for (const [key, entries] of this.questionIndex) {
+    for (const [key, entries] of this.marketIndex) {
       if (key === normalized) continue;
 
-      // Check similarity (simple word overlap)
-      const similarity = this.questionSimilarity(normalized, key);
-      if (similarity < 0.7) continue;
+      // Gate 1: Question text similarity
+      const sim = this.similarity(normalized, key);
+      if (sim < this.SIMILARITY_THRESHOLD) continue;
 
       for (const entry of entries) {
         if (entry.id === market.id) continue;
 
-        const otherYesPrice = entry.prices[0] ?? 0.5;
-        const priceDiff = Math.abs(yesPrice - otherYesPrice);
-
-        if (priceDiff >= this.CROSS_MARKET_THRESHOLD) {
-          const dedupKey = `cross:${market.id}:${entry.id}`;
-          if (this.seenOpportunities.has(dedupKey)) continue;
-          this.seenOpportunities.add(dedupKey);
-
-          // Buy the cheaper market's YES
-          const isCheaper = yesPrice < otherYesPrice;
-          const outcome = isCheaper ? 'YES' as const : 'NO' as const;
-          const price = isCheaper ? yesPrice : 1 - yesPrice;
-
-          const confidence = Math.min(0.85, 0.5 + priceDiff * 2);
-          const size = Math.min(
-            context.agent.equity.current * 0.05,
-            context.agent.config.maxOrderSize
-          );
-
-          if (size < 1) continue;
-
-          logger.info(`🔄 Cross-market arbitrage found`, {
-            market1: market.question.slice(0, 40),
-            market2: entry.question.slice(0, 40),
-            price1: yesPrice.toFixed(4),
-            price2: otherYesPrice.toFixed(4),
-            diff: (priceDiff * 100).toFixed(2) + '%',
-          });
-
-          return this.createSignal(market.id, {
-      tokenId: market.tokenIds?.[0],
-      negRisk: market.negRisk,
-            direction: 'BUY',
-            outcome,
-            confidence,
-            suggestedPrice: price,
-            suggestedSize: size,
-            reasoning: `🔄 Cross-Market Arb: "${market.question.slice(0, 50)}" at $${yesPrice.toFixed(4)} vs similar "${entry.question.slice(0, 50)}" at $${otherYesPrice.toFixed(4)}. Price divergence: ${(priceDiff * 100).toFixed(2)}%.`,
-          });
+        // Gate 2: Same category (skip if either is unknown)
+        const entryCat = (entry.category || '').toLowerCase().trim();
+        if (marketCat && entryCat && marketCat !== entryCat) {
+          logger.debug(`[Arb] Skipping cross-category pair: ${marketCat} ≠ ${entryCat}`);
+          continue;
         }
+
+        // Gate 3: Numeric thresholds must match (within tolerance)
+        const entryNumbers = this.extractNumbers(entry.question);
+        if (!this.numbersMatch(marketNumbers, entryNumbers)) {
+          logger.debug(`[Arb] Skipping: threshold mismatch in "${market.question.slice(0, 40)}" vs "${entry.question.slice(0, 40)}"`);
+          continue;
+        }
+
+        // Gate 4: Price divergence
+        const otherYesPrice = entry.prices[0] ?? 0.5;
+        const priceDiff     = Math.abs(yesPrice - otherYesPrice);
+        if (priceDiff < this.DUPLICATE_MIN_DIVERGENCE) continue;
+
+        const dedupKey = [market.id, entry.id].sort().join(':');
+        if (this.seenOpportunities.has(dedupKey)) continue;
+        this.seenOpportunities.add(dedupKey);
+
+        // Buy the cheaper side
+        const isCheaper = yesPrice < otherYesPrice;
+        const outcome   = isCheaper ? 'YES' as const : 'NO' as const;
+        const price     = isCheaper ? yesPrice : 1 - yesPrice;
+        const confidence = Math.min(0.85, 0.55 + priceDiff * 2);
+        const size      = Math.min(
+          context.agent.equity.current * 0.01,   // 1% of bankroll max
+          context.agent.config.maxOrderSize,
+        );
+
+        if (size < 1) continue;
+
+        logger.info(
+          `🔄 Duplicate market arb: sim=${(sim * 100).toFixed(0)}% | ` +
+          `"${market.question.slice(0, 35)}" $${yesPrice.toFixed(4)} vs ` +
+          `"${entry.question.slice(0, 35)}" $${otherYesPrice.toFixed(4)} | diff=${(priceDiff * 100).toFixed(2)}%`
+        );
+
+        return this.createSignal(market.id, {
+          tokenId:       market.tokenIds?.[0],
+          negRisk:       market.negRisk,
+          direction:     'BUY',
+          outcome,
+          confidence,
+          suggestedPrice: price,
+          suggestedSize:  size,
+          reasoning: `🔄 Duplicate Market Arb (sim=${(sim * 100).toFixed(0)}%): ` +
+            `"${market.question.slice(0, 50)}" $${yesPrice.toFixed(4)} vs ` +
+            `"${entry.question.slice(0, 50)}" $${otherYesPrice.toFixed(4)}. ` +
+            `Divergence: ${(priceDiff * 100).toFixed(2)}%. Same event, two prices.`,
+        });
       }
     }
 
     return null;
   }
 
-  private indexMarket(market: Market): void {
-    const key = this.normalizeQuestion(market.question);
-    const entries = this.questionIndex.get(key) ?? [];
-    const existing = entries.findIndex(e => e.id === market.id);
-    const entry = { id: market.id, question: market.question, prices: market.outcomePrices };
+  // ─── Market Index ─────────────────────────────────────────────────────────
 
-    if (existing >= 0) {
-      entries[existing] = entry;
-    } else {
-      entries.push(entry);
-    }
-    this.questionIndex.set(key, entries);
+  private indexMarket(market: Market): void {
+    const key   = this.normalize(market.question);
+    const entry: IndexedMarket = {
+      id:       market.id,
+      question: market.question,
+      category: market.category || '',
+      prices:   market.outcomePrices,
+    };
+    const list  = this.marketIndex.get(key) ?? [];
+    const idx   = list.findIndex(e => e.id === market.id);
+    if (idx >= 0) list[idx] = entry; else list.push(entry);
+    this.marketIndex.set(key, list);
   }
 
-  private normalizeQuestion(q: string): string {
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  private normalize(q: string): string {
     return q.toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
-  private questionSimilarity(a: string, b: string): number {
-    const wordsA = new Set(a.split(' ').filter(w => w.length > 3));
-    const wordsB = new Set(b.split(' ').filter(w => w.length > 3));
-    if (wordsA.size === 0 || wordsB.size === 0) return 0;
-
+  /**
+   * Word-overlap Jaccard similarity on words longer than 3 chars.
+   * Returns 0–1; 1 = identical.
+   */
+  private similarity(a: string, b: string): number {
+    const setA = new Set(a.split(' ').filter(w => w.length > 3));
+    const setB = new Set(b.split(' ').filter(w => w.length > 3));
+    if (setA.size === 0 && setB.size === 0) return 1;
+    if (setA.size === 0 || setB.size === 0) return 0;
     let overlap = 0;
-    for (const w of wordsA) {
-      if (wordsB.has(w)) overlap++;
-    }
+    for (const w of setA) if (setB.has(w)) overlap++;
+    return overlap / (setA.size + setB.size - overlap); // Jaccard
+  }
 
-    return overlap / Math.max(wordsA.size, wordsB.size);
+  /**
+   * Extract all positive numbers from a question string.
+   * Used to verify thresholds match between candidate pairs.
+   */
+  private extractNumbers(q: string): number[] {
+    const raw = q.match(/[\d,]+\.?\d*/g) ?? [];
+    return raw
+      .map(m => parseFloat(m.replace(/,/g, '')))
+      .filter(n => !isNaN(n) && n > 0);
+  }
+
+  /**
+   * Checks that two number arrays describe the same thresholds.
+   * Both must have the same count, and each pair must be within tolerance.
+   *
+   * Examples that PASS (same event):
+   *   [3000] vs [3000]  — "Gold > $3000" (same threshold)
+   *
+   * Examples that FAIL (different events):
+   *   [1800] vs [2000]  — "ETH > $1800" vs "ETH > $2000" (different thresholds)
+   *   [12]   vs [13]    — "London 12°C" vs "London 13°C"  (different thresholds)
+   *   []     vs [3000]  — one has no number, the other does
+   */
+  private numbersMatch(a: number[], b: number[]): boolean {
+    // If neither question has numbers, allow (non-numeric events like "Will X win?")
+    if (a.length === 0 && b.length === 0) return true;
+    // Different count = different questions
+    if (a.length !== b.length) return false;
+    // Each number pair must agree within tolerance
+    return a.every((n, i) => {
+      const other = b[i];
+      const maxVal = Math.max(n, other);
+      return maxVal === 0 || Math.abs(n - other) / maxVal <= this.NUMBER_TOLERANCE;
+    });
   }
 }
