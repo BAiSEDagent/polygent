@@ -32,8 +32,8 @@ export class MeanReversionStrategy extends BaseStrategy {
   readonly version = '1.0.0';
 
   // ── Configuration ──────────────────────────────────────────────────────
-  private readonly WINDOW_SIZE = 60;           // 60 x 1-min snapshots
-  private readonly Z_ENTRY_THRESHOLD = 2.5;    // Only trade < 1% events
+  private readonly WINDOW_SIZE = 5;           // 60 x 1-min snapshots
+  private readonly Z_ENTRY_THRESHOLD = 1.5;    // Only trade < 1% events
   private readonly Z_EXIT_THRESHOLD = 0.0;     // Exit when price touches mean
   private readonly MOMENTUM_LOOKBACK = 5;      // 5-minute momentum window
   private readonly MAX_MOMENTUM = 0.04;        // Skip if > $0.04 move in 5 min

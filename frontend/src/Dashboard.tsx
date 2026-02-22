@@ -30,7 +30,7 @@ export function Dashboard() {
 
   const leaderboard    = lbData?.leaderboard ?? [];
   const realActivities = actData?.activity   ?? [];
-  const activities     = useSimulation(realActivities, true);
+  const activities     = useSimulation(realActivities, false);
 
   // Called by OperatorBridge when EOA link is established
   const handleOperatorConnected = (_address: string) => {

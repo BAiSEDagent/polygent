@@ -31,8 +31,8 @@ export class ArbitrageStrategy extends BaseStrategy {
   readonly description = 'Exploit YES+NO pricing inefficiencies for risk-free profit';
   readonly version = '1.0.0';
 
-  private readonly MIN_SPREAD = 0.02;        // 2% minimum spread to trigger
-  private readonly CROSS_MARKET_THRESHOLD = 0.05; // 5% price divergence for cross-market
+  private readonly MIN_SPREAD = 0.01;        // 2% minimum spread to trigger
+  private readonly CROSS_MARKET_THRESHOLD = 0.03; // 5% price divergence for cross-market
   private seenOpportunities = new Set<string>(); // Dedup within session
   private questionIndex = new Map<string, Array<{ id: string; question: string; prices: number[] }>>();
 
