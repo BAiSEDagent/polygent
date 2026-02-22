@@ -22,6 +22,7 @@ import { ContrarianStrategy } from './strategies/contrarian';
 import { SentimentStrategy } from './strategies/sentiment';
 import { MeanReversionStrategy } from "./strategies/mean-reversion";
 import { MarketMakerStrategy } from './strategies/market-maker';
+import { fullSetArbObserver } from './services/fullset-observer';
 
 const app = express();
 const server = http.createServer(app);
@@ -190,6 +191,11 @@ async function bootstrap(): Promise<void> {
 
   // 4. Start agent runner
   await agentRunner.start();
+
+  // 4b. Start Full-Set Arb Observer (OBSERVE mode — zero trades, pure data collection)
+  // Scans BTC/ETH 5m/15m markets every 20s, logs opportunities, reports every 30min.
+  // Check /api/fullset/report for live stats.
+  fullSetArbObserver.start();
 
   // 5. Start Express server
   const bindHost = process.env.BIND_ALL === 'true' ? '0.0.0.0' : '127.0.0.1';

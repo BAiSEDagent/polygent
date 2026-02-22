@@ -9,6 +9,7 @@ import { agentRunner } from '../core/agent-runner';
 import { paperTrader } from '../core/paper-trader';
 import { agentStore } from '../models/agent';
 import { tradeStore } from '../models/trade';
+import { fullSetArbObserver } from '../services/fullset-observer';
 import { authenticateAgent, requireAdmin } from '../utils/auth';
 
 const router = Router();
@@ -89,6 +90,27 @@ router.get('/connected-agents', requireAdmin, (_req: Request, res: Response) => 
       };
     });
   res.json({ agents, total: agents.length });
+});
+
+// ─── Full-Set Arb Observer endpoints ────────────────────────────────────────
+
+/** GET /api/fullset/report — Aggregate opportunity stats since observer start */
+router.get('/fullset/report', (_req: Request, res: Response) => {
+  res.json(fullSetArbObserver.getReport());
+});
+
+/** GET /api/fullset/snapshots?universe=BTC_5M&limit=100 */
+router.get('/fullset/snapshots', (req: Request, res: Response) => {
+  const universe = req.query.universe as string | undefined;
+  const limit = parseInt(req.query.limit as string ?? '100', 10);
+  res.json({ snapshots: fullSetArbObserver.getRecentSnapshots(universe, limit) });
+});
+
+/** GET /api/fullset/opportunities?universe=BTC_5M&limit=50 */
+router.get('/fullset/opportunities', (req: Request, res: Response) => {
+  const universe = req.query.universe as string | undefined;
+  const limit = parseInt(req.query.limit as string ?? '50', 10);
+  res.json({ opportunities: fullSetArbObserver.getCompletedOpps(universe, limit) });
 });
 
 export default router;
