@@ -38,7 +38,6 @@
  * tokenIds[0] = Up token, tokenIds[1] = Down token.
  */
 
-import { gammaClient } from '../core/gamma';
 import { getDb } from '../core/db';
 import { logger } from '../utils/logger';
 
@@ -87,19 +86,8 @@ async function fetchBook(tokenId: string): Promise<OrderBook | null> {
   }
 }
 
-// ─── Universe filters ─────────────────────────────────────────────────────────
+// ─── Universe types ───────────────────────────────────────────────────────────
 type Universe = 'BTC_5M' | 'BTC_15M' | 'ETH_5M' | 'ETH_15M';
-
-function detectUniverse(question: string, slug?: string): Universe | null {
-  const q = question.toLowerCase();
-  const s = (slug ?? '').toLowerCase();
-
-  if (/btc-updown-5m-\d+/.test(s) || (q.includes('bitcoin') || q.includes('btc')) && q.includes('5') && (q.includes('min') || q.includes('minute'))) return 'BTC_5M';
-  if (/btc-updown-15m-\d+/.test(s) || (q.includes('bitcoin') || q.includes('btc')) && q.includes('15') && (q.includes('min') || q.includes('minute'))) return 'BTC_15M';
-  if (/eth-updown-5m-\d+/.test(s) || (q.includes('ethereum') || q.includes('eth')) && q.includes('5') && (q.includes('min') || q.includes('minute'))) return 'ETH_5M';
-  if (/eth-updown-15m-\d+/.test(s) || (q.includes('ethereum') || q.includes('eth')) && q.includes('15') && (q.includes('min') || q.includes('minute'))) return 'ETH_15M';
-  return null;
-}
 
 // ─── Opportunity tracking ─────────────────────────────────────────────────────
 interface OpportunityWindow {
@@ -235,6 +223,26 @@ class FullSetArbObserver {
     logger.debug(`FullSetArb scan done: ${succeeded}/${markets.length} succeeded in ${elapsed}ms`);
   }
 
+  /**
+   * Universe slug templates. The timestamp component is: floor(unixSec / 300) * 300
+   * That is the UTC start time of the current 5-minute slot.
+   * Pattern validated Feb 22, 2026: btc-updown-5m-1771752600 = "4:30AM-4:35AM ET"
+   */
+  private readonly UNIVERSE_SLUGS: Record<Universe, string> = {
+    BTC_5M:  'btc-updown-5m',
+    BTC_15M: 'btc-updown-15m',
+    ETH_5M:  'eth-updown-5m',
+    ETH_15M: 'eth-updown-15m',
+  };
+
+  /** Slot duration in seconds per universe */
+  private readonly SLOT_SECONDS: Record<Universe, number> = {
+    BTC_5M:  300,
+    BTC_15M: 900,
+    ETH_5M:  300,
+    ETH_15M: 900,
+  };
+
   private async discoverUniverseMarkets(): Promise<Array<{
     marketId: string;
     universe: Universe;
@@ -243,41 +251,50 @@ class FullSetArbObserver {
     downTokenId: string;
     endDate: string;
   }>> {
-    try {
-      // Fetch a broader set of markets and filter
-      const allMarkets = await gammaClient.listMarkets({ limit: 100 });
+    const universes: Universe[] = ['BTC_5M', 'ETH_5M', 'BTC_15M', 'ETH_15M'];
+    const nowSec = Math.floor(Date.now() / 1000);
 
-      const result: Array<{
-        marketId: string;
-        universe: Universe;
-        question: string;
-        upTokenId: string;
-        downTokenId: string;
-        endDate: string;
-      }> = [];
+    const fetches = universes.map(async (universe) => {
+      const slot = this.SLOT_SECONDS[universe];
+      const slotStart = Math.floor(nowSec / slot) * slot;
+      const prefix = this.UNIVERSE_SLUGS[universe];
 
-      for (const m of allMarkets) {
-        if (m.closed || !m.active) continue;
-        if (!m.tokenIds || m.tokenIds.length < 2) continue;
+      // Try current slot first, then previous slot as fallback
+      for (const ts of [slotStart, slotStart - slot]) {
+        const slug = `${prefix}-${ts}`;
+        try {
+          const res = await fetch(
+            `https://gamma-api.polymarket.com/markets?slug=${slug}`,
+            { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(5000) }
+          );
+          if (!res.ok) continue;
+          const raw = await res.json() as any;
+          const markets = Array.isArray(raw) ? raw : [raw];
+          const m = markets.find((x: any) => x.slug === slug && x.active && !x.closed);
+          if (!m) continue;
 
-        const universe = detectUniverse(m.question);
-        if (!universe) continue;
+          const tokenIds: string[] = JSON.parse(
+            typeof m.clobTokenIds === 'string' ? m.clobTokenIds : JSON.stringify(m.clobTokenIds)
+          );
+          if (tokenIds.length < 2) continue;
 
-        result.push({
-          marketId: m.id,
-          universe,
-          question: m.question,
-          upTokenId: m.tokenIds[0],   // Up/Yes token
-          downTokenId: m.tokenIds[1], // Down/No token
-          endDate: m.endDate,
-        });
+          return {
+            marketId: String(m.id),
+            universe,
+            question: String(m.question ?? slug),
+            upTokenId: tokenIds[0],
+            downTokenId: tokenIds[1],
+            endDate: String(m.endDate ?? ''),
+          };
+        } catch { /* try fallback */ }
       }
+      return null;
+    });
 
-      return result;
-    } catch (err: any) {
-      logger.warn('FullSetArb universe discovery failed', { err: err.message });
-      return [];
-    }
+    const results = await Promise.allSettled(fetches);
+    return results
+      .filter(r => r.status === 'fulfilled' && r.value !== null)
+      .map(r => (r as PromiseFulfilledResult<any>).value);
   }
 
   private async scanMarket(market: {
