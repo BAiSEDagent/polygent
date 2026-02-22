@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "http://72.61.138.205:3000/api/$1"
+    },
+    {
+      "source": "/health",
+      "destination": "http://72.61.138.205:3000/health"
+    },
+    {
+      "source": "/ws/(.*)",
+      "destination": "http://72.61.138.205:3000/ws/$1"
+    }
+  ]
+}
