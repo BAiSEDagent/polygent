@@ -1,20 +1,43 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import { useDashboardStore } from '../store/dashboard';
+import io from 'socket.io-client';
 
-export function useWebSocket(path = '/ws/feed') {
-  const wsRef = useRef<WebSocket | null>(null);
-  const [lastMessage, setLastMessage] = useState<any>(null);
-  const [connected, setConnected] = useState(false);
-
-  const connect = useCallback(() => {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${proto}//${location.host}${path}`);
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => { setConnected(false); setTimeout(connect, 3000); };
-    ws.onmessage = (e) => { try { setLastMessage(JSON.parse(e.data)); } catch {} };
-    wsRef.current = ws;
-  }, [path]);
-
-  useEffect(() => { connect(); return () => wsRef.current?.close(); }, [connect]);
-
-  return { lastMessage, connected };
+export function useWebSocket() {
+  const socketRef = useRef<any>(null);
+  const { setConnected, updateAgent } = useDashboardStore();
+  
+  useEffect(() => {
+    // Connect to VPS WebSocket
+    const socket = io('http://72.61.138.205:3000', {
+      transports: ['websocket'],
+      reconnection: true,
+    });
+    
+    socketRef.current = socket;
+    
+    socket.on('connect', () => {
+      setConnected(true);
+      console.log('Connected to Polygent VPS');
+    });
+    
+    socket.on('disconnect', () => {
+      setConnected(false);
+    });
+    
+    // Listen for agent updates
+    socket.on('agent:update', (data) => {
+      updateAgent(data.id, data);
+    });
+    
+    // Listen for new trades
+    socket.on('trade:new', (trade) => {
+      console.log('New trade:', trade);
+    });
+    
+    return () => {
+      socket.disconnect();
+    };
+  }, [setConnected, updateAgent]);
+  
+  return socketRef.current;
 }
