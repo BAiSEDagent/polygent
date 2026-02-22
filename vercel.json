@@ -3,26 +3,5 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": null,
-  "installCommand": "cd frontend && npm install",
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "http://72.61.138.205:3000/api/$1"
-    },
-    {
-      "src": "/health",
-      "dest": "http://72.61.138.205:3000/health"
-    },
-    {
-      "src": "/ws/(.*)",
-      "dest": "http://72.61.138.205:3000/ws/$1"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  "installCommand": "cd frontend && npm install"
 }
