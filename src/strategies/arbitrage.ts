@@ -43,6 +43,7 @@ interface IndexedMarket {
   category: string;
   eventId?: string;
   prices: number[];
+  negRisk: boolean; // true = mutually exclusive outcomes (only one can resolve YES)
 }
 
 export class ArbitrageStrategy extends BaseStrategy {
@@ -85,7 +86,10 @@ export class ArbitrageStrategy extends BaseStrategy {
     if (spreadSignal) return spreadSignal;
 
     // 2. Same-event sum-to-one arb (event-group mispricing via eventId)
-    if (market.eventId) {
+    // Only applies to negRisk markets — these are mutually exclusive outcomes
+    // (e.g. Trump deportation brackets). Non-negRisk multi-market events
+    // (e.g. "GTA VI before X") are independent events, not mutually exclusive.
+    if (market.eventId && market.negRisk) {
       const eventSignal = this.checkSameEventArb(market, context);
       if (eventSignal) return eventSignal;
     }
@@ -296,6 +300,7 @@ export class ArbitrageStrategy extends BaseStrategy {
         category: market.category || '',
         eventId:  market.eventId,
         prices:   market.outcomePrices,
+        negRisk:  market.negRisk,
       };
       if (existing >= 0) list[existing] = entry; else list.push(entry);
       this.eventIndex.set(market.eventId, list);
@@ -309,6 +314,7 @@ export class ArbitrageStrategy extends BaseStrategy {
       category: market.category || '',
       eventId:  market.eventId,
       prices:   market.outcomePrices,
+      negRisk:  market.negRisk,
     };
     const list  = this.questionIndex.get(key) ?? [];
     const idx   = list.findIndex(e => e.id === market.id);
