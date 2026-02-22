@@ -21,6 +21,7 @@ import { ArbitrageStrategy } from './strategies/arbitrage';
 import { ContrarianStrategy } from './strategies/contrarian';
 import { SentimentStrategy } from './strategies/sentiment';
 import { MeanReversionStrategy } from "./strategies/mean-reversion";
+import { MarketMakerStrategy } from './strategies/market-maker';
 
 const app = express();
 const server = http.createServer(app);
@@ -173,6 +174,14 @@ async function bootstrap(): Promise<void> {
   agentRunner.registerAgent('Sentiment', new SentimentStrategy(), {
     deposit: 10_000,
     intervalMs: 15 * 60_000,
+  });
+
+  // Market Maker — passive spread provisioning on high-liquidity crypto markets.
+  // 15-second refresh rate for active quote management.
+  // Tracks maker_fees separately for spread revenue attribution.
+  agentRunner.registerAgent('Market Maker', new MarketMakerStrategy(), {
+    deposit: 10_000,
+    intervalMs: 15_000, // 15-second refresh — active quote management
   });
 
   } catch (agentErr: any) {

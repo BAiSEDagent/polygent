@@ -24,6 +24,9 @@ export interface PersistedPaperTrade {
   reasoning: string;
   slippage: number;
   timestamp: number;
+  /** Estimated maker fee (2% of notional). Tracked separately for revenue attribution.
+   *  Market Maker trades show spread revenue net of fees. 0 for non-MM strategies. */
+  makerFee: number;
 }
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'polygent.db');
@@ -149,12 +152,23 @@ function migrate(db: Database.Database): void {
       notional REAL NOT NULL,
       reasoning TEXT,
       slippage REAL NOT NULL DEFAULT 0,
+      maker_fee REAL NOT NULL DEFAULT 0,
       timestamp INTEGER NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_paper_agent ON paper_trades(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_paper_strategy ON paper_trades(strategy_name);
     CREATE INDEX IF NOT EXISTS idx_paper_timestamp ON paper_trades(timestamp);
   `);
+
+  // Safe migration: add maker_fee to existing paper_trades tables that were
+  // created before this column was added. SQLite requires try/catch for this.
+  try {
+    db.exec(`ALTER TABLE paper_trades ADD COLUMN maker_fee REAL NOT NULL DEFAULT 0`);
+    logger.info('Migrated paper_trades: added maker_fee column');
+  } catch {
+    // Column already exists — expected on fresh installs with updated schema
+  }
 
   logger.info('Database migrations applied');
 }
@@ -178,13 +192,13 @@ export function insertPaperTrade(
         market_id, market_question,
         side, outcome,
         requested_price, executed_price,
-        amount, notional, reasoning, slippage, timestamp
+        amount, notional, reasoning, slippage, maker_fee, timestamp
       ) VALUES (
         @id, @agentId, @agentName, @strategyName,
         @marketId, @marketQuestion,
         @side, @outcome,
         @requestedPrice, @executedPrice,
-        @amount, @notional, @reasoning, @slippage, @timestamp
+        @amount, @notional, @reasoning, @slippage, @makerFee, @timestamp
       )
     `).run({
       id: trade.id,
@@ -201,6 +215,7 @@ export function insertPaperTrade(
       notional: trade.notional,
       reasoning: trade.reasoning ?? null,
       slippage: trade.slippage,
+      makerFee: trade.makerFee ?? 0,
       timestamp: trade.timestamp,
     });
   } catch (err) {
@@ -235,6 +250,7 @@ export function loadPaperTrades(): PersistedPaperTrade[] {
       notional: r.notional,
       reasoning: r.reasoning ?? '',
       slippage: r.slippage,
+      makerFee: r.maker_fee ?? 0,
       timestamp: r.timestamp,
     }));
   } catch (err) {

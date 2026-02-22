@@ -34,6 +34,9 @@ export interface PaperTrade {
   reasoning: string;
   timestamp: number;
   slippage: number;
+  /** Estimated Polymarket taker fee (2% of notional).
+   *  Tracked separately to distinguish MM spread revenue from arb profits. */
+  makerFee: number;
 }
 
 export interface AgentPerformance {
@@ -50,6 +53,9 @@ export interface AgentPerformance {
   currentEquity: number;
   depositedEquity: number;
   lastTradeAt: number | null;
+  /** Sum of estimated Polymarket fees paid across all trades.
+   *  Useful for calculating true net PnL vs. gross PnL. */
+  totalFeesPaid: number;
 }
 
 // Hard cap on paper trade size — prevents $500 blowouts on $10k bankroll.
@@ -156,6 +162,9 @@ class PaperTradingEngine {
     const slippage = Math.abs(executedPrice - signal.suggestedPrice);
     const notional = cappedSize * executedPrice;
 
+    // Estimate Polymarket taker fee (2% of notional — applies to both maker and taker)
+    const makerFee = notional * 0.02;
+
     // Create paper trade record
     const paperTrade: PaperTrade = {
       id: `pt_${uuid().replace(/-/g, '').slice(0, 16)}`,
@@ -171,6 +180,7 @@ class PaperTradingEngine {
       reasoning: signal.reasoning,
       timestamp: Date.now(),
       slippage,
+      makerFee,
     };
 
     this.paperTrades.push(paperTrade);
@@ -288,7 +298,8 @@ class PaperTradingEngine {
     const maxDrawdown = this.calculateMaxDrawdown(agent.id);
 
     // Last trade timestamp — proof of life
-    const lastTradeAt = trades.length > 0 ? trades[0].timestamp : null;
+    const lastTradeAt   = trades.length > 0 ? trades[0].timestamp : null;
+    const totalFeesPaid = trades.reduce((s, t) => s + (t.makerFee ?? 0), 0);
 
     return {
       agentId: agent.id,
@@ -304,6 +315,7 @@ class PaperTradingEngine {
       currentEquity: agent.equity.current,
       depositedEquity: agent.equity.deposited,
       lastTradeAt,
+      totalFeesPaid,
     };
   }
 
