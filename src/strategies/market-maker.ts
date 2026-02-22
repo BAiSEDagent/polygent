@@ -83,9 +83,10 @@ export class MarketMakerStrategy extends BaseStrategy {
     if (!market.active || market.closed) return null;
     if (market.outcomePrices.length < 2) return null;
 
-    // Category filter
+    // Category filter — only restrict if category is populated.
+    // Many Gamma API markets have empty category; scan all liquid markets.
     const cat = (market.category || '').toLowerCase();
-    if (!this.TARGET_CATEGORIES.some(c => cat.includes(c))) return null;
+    if (cat && !this.TARGET_CATEGORIES.some(c => cat.includes(c))) return null;
 
     // Liquidity filter — avoid thin books
     if ((market.liquidity || 0) < this.MIN_LIQUIDITY) return null;
