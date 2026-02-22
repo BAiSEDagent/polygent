@@ -120,6 +120,11 @@ export interface Market {
   closed: boolean;
   category: string;
   tags: string[];
+  /** Gamma API event group ID. Markets sharing the same eventId are outcomes
+   *  of the same underlying real-world event (e.g. all temp brackets for
+   *  "London high temp on Feb 22"). Used by ArbitrageStrategy for
+   *  institutional-grade event-based grouping instead of text matching. */
+  eventId?: string;
 }
 
 // ─── Portfolio ───────────────────────────────────────────────────────────────

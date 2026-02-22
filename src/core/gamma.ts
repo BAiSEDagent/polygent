@@ -91,6 +91,11 @@ class GammaClient {
       closed: raw.closed ?? false,
       category: raw.category ?? '',
       tags: raw.tags ?? [],
+      // Gamma groups related markets (e.g. all temp brackets) under a shared event.
+      // Extract the first event id — this is the institutional grouping key.
+      eventId: Array.isArray(raw.events) && raw.events[0]?.id
+        ? String(raw.events[0].id)
+        : undefined,
     };
   }
 
