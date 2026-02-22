@@ -30,7 +30,7 @@ export default function Layout() {
       {/* Top Bar */}
       <header className="h-12 flex items-center justify-between px-5 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-8">
-          <span className="font-mono font-bold text-emerald-400 text-lg tracking-[0.25em]">COGENT</span>
+          <span className="font-mono font-bold text-emerald-400 text-lg tracking-[0.25em]">POLYGENT</span>
           <nav className="flex gap-5">
             {navItems.map(({ to, label }) => (
               <NavLink
