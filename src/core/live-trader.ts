@@ -121,9 +121,9 @@ export class LiveTrader {
       return { success: false, error: msg, tokenId, side, price, size };
     }
 
-    // Gate 3: Price sanity
-    if (price <= 0 || price >= 1) {
-      const msg = `Invalid price ${price} — must be between 0 and 1 exclusive`;
+    // Gate 3: Price sanity — Polymarket requires [0.01, 0.99]
+    if (price < 0.01 || price > 0.99) {
+      const msg = `Invalid price ${price} — Polymarket requires 0.01–0.99`;
       logger.warn(msg);
       return { success: false, error: msg, tokenId, side, price, size };
     }
@@ -131,6 +131,13 @@ export class LiveTrader {
     // Gate 4: Size sanity
     if (size <= 0 || size > 10000) {
       const msg = `Invalid size ${size}`;
+      logger.warn(msg);
+      return { success: false, error: msg, tokenId, side, price, size };
+    }
+
+    // Gate 4b: Minimum order value — Polymarket requires >= $1.00
+    if (orderValue < 1.0) {
+      const msg = `Order value $${orderValue.toFixed(4)} below $1.00 minimum`;
       logger.warn(msg);
       return { success: false, error: msg, tokenId, side, price, size };
     }
