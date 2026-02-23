@@ -149,6 +149,25 @@ export class LiveTrader {
       return { success: false, error: msg, tokenId, side, price, size };
     }
 
+    // Gate 6: Collateral preflight for BUY orders (avoid noisy CLOB rejects)
+    if (side === 'BUY') {
+      try {
+        const ba = await this.client.getBalanceAllowance({ asset_type: 'COLLATERAL' } as any);
+        const raw = Number(ba?.balance || 0); // USDC 6 decimals
+        const required = Math.ceil(orderValue * 1_000_000);
+        if (!Number.isFinite(raw) || raw < required) {
+          const available = raw / 1_000_000;
+          const msg = `Insufficient collateral preflight: need $${orderValue.toFixed(2)}, available $${available.toFixed(2)}`;
+          logger.warn(msg);
+          return { success: false, error: msg, tokenId, side, price, size };
+        }
+      } catch (e: any) {
+        const msg = `Collateral preflight failed: ${(e?.message || 'unknown').slice(0, 120)}`;
+        logger.warn(msg);
+        return { success: false, error: msg, tokenId, side, price, size };
+      }
+    }
+
     // === PLACE ORDER ===
     try {
       logger.info(`Placing LIVE order: ${side} ${size} @ ${price} on ${tokenId.slice(0, 16)}...`);
