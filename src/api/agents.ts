@@ -317,15 +317,22 @@ router.post('/onboard', async (req: Request, res: Response) => {
       return;
     }
 
-    // Register the agent in our system
+    // Register the agent in our system using the same flow as /register
     const { Wallet } = await import('ethers');
+    const { v4: uuid } = await import('uuid');
     const wallet = new Wallet(privateKey);
 
+    const apiKey = generateApiKey();
+    const apiKeyHash = hashApiKey(apiKey);
+    const id = `ext_${uuid().replace(/-/g, '').slice(0, 12)}`;
+
     const agent = agentStore.createExternal({
+      id,
       name: name || `Agent ${wallet.address.slice(0, 8)}`,
       description: 'Onboarded via Polygent builder relay',
-      eoaAddress: wallet.address,
-      proxyAddress: result.safeAddress!,
+      apiKeyHash,
+      walletAddress: wallet.address,
+      proxyWallet: result.safeAddress!,
     });
 
     logger.info('Agent onboarded successfully', {
@@ -335,7 +342,7 @@ router.post('/onboard', async (req: Request, res: Response) => {
 
     res.status(201).json({
       agentId: agent.id,
-      apiKey: agent.apiKey,
+      apiKey,  // Shown once — agent must store this
       safeAddress: result.safeAddress,
       approvalsTxHash: result.approvalsTxHash,
       clobCredentials: result.clobCreds,
