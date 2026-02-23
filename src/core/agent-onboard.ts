@@ -226,9 +226,9 @@ export async function deriveClobCreds(agentPk: string): Promise<{
   logger.info('Deriving CLOB API credentials...');
   const creds = await client.createOrDeriveApiKey();
 
-  logger.info(`CLOB creds derived (key: ${creds.apiKey.slice(0, 8)}...)`);
+  logger.info(`CLOB creds derived (key: ${creds.key.slice(0, 8)}...)`);
   return {
-    apiKey: creds.apiKey,
+    apiKey: creds.key,
     secret: creds.secret,
     passphrase: creds.passphrase,
   };
