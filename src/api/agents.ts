@@ -321,16 +321,11 @@ router.post('/onboard', async (req: Request, res: Response) => {
     const { Wallet } = await import('ethers');
     const wallet = new Wallet(privateKey);
 
-    const agent = agentStore.register({
+    const agent = agentStore.createExternal({
       name: name || `Agent ${wallet.address.slice(0, 8)}`,
       description: 'Onboarded via Polygent builder relay',
-      walletAddress: wallet.address,
-      proxyWallet: result.safeAddress!,
-      deposit: 0,
-      config: {},
-      interval: 0,
-      strategy: 'external',
-      version: '1.0.0',
+      eoaAddress: wallet.address,
+      proxyAddress: result.safeAddress!,
     });
 
     logger.info('Agent onboarded successfully', {
