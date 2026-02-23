@@ -10,5 +10,7 @@ miniapp/.next
 miniapp/node_modules
 .next/
 frontend/dist/
-.next/
-frontend/dist/
+.vercel/
+miniapp/.vercel/
+test-intercept.ts
+test-intercept.js

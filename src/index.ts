@@ -14,6 +14,7 @@ import { paperTrader } from './core/paper-trader';
 import { agentStore } from './models/agent';
 import { tradeStore } from './models/trade';
 import { initLiveTrader } from './core/live-trader';
+import { installConsoleRedaction } from './utils/redact';
 
 // Strategies
 import { WhaleTrackerStrategy } from './strategies/whale-tracker';
@@ -23,6 +24,9 @@ import { SentimentStrategy } from './strategies/sentiment';
 import { MeanReversionStrategy } from "./strategies/mean-reversion";
 import { MarketMakerStrategy } from './strategies/market-maker';
 import { fullSetArbObserver } from './services/fullset-observer';
+
+// Redact credential-like values from dependency console logs
+installConsoleRedaction();
 
 const app = express();
 const server = http.createServer(app);
