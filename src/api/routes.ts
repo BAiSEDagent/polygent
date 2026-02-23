@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import agentsRouter from './agents';
 import ordersRouter from './orders';
+import builderSignRouter from './builder-sign';
 import marketsRouter from './markets';
 import portfolioRouter from './portfolio';
 import copiersRouter from './copiers';
@@ -16,6 +17,9 @@ const router = Router();
 
 router.use('/agents', agentsRouter);
 router.use('/orders', ordersRouter);
+
+// Mount at /api/sign — but also need /sign at root for SDK compatibility
+router.use('/sign', builderSignRouter);
 router.use('/markets', marketsRouter);
 router.use('/portfolio', portfolioRouter);
 router.use('/copiers', copiersRouter);

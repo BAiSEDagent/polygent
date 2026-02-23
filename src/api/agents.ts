@@ -289,4 +289,68 @@ router.post('/:id/reset', requireAdmin, (req: Request, res: Response) => {
   res.json({ id: agent.id, status: agent.status, message: 'Circuit breaker reset' });
 });
 
+/**
+ * POST /api/agents/onboard — Full agent onboarding (deploy Safe + approvals + derive CLOB creds)
+ *
+ * Body: { privateKey: "0x..." }
+ *
+ * ⚠️ SECURITY: This endpoint receives the agent's private key to deploy their Safe.
+ * The key is used transiently and NEVER stored. In production, this should be
+ * replaced with a client-side flow where the agent signs locally.
+ *
+ * For now, this enables server-side onboarding for AI agents that trust Polygent.
+ */
+router.post('/onboard', async (req: Request, res: Response) => {
+  const { privateKey, name } = req.body as { privateKey?: string; name?: string };
+
+  if (!privateKey || !privateKey.startsWith('0x')) {
+    res.status(400).json({ error: 'privateKey (hex, 0x-prefixed) is required' });
+    return;
+  }
+
+  try {
+    const { onboardAgent } = await import('../core/agent-onboard');
+    const result = await onboardAgent(privateKey as `0x${string}`);
+
+    if (!result.success) {
+      res.status(500).json({ error: result.error });
+      return;
+    }
+
+    // Register the agent in our system
+    const { Wallet } = await import('ethers');
+    const wallet = new Wallet(privateKey);
+
+    const agent = agentStore.register({
+      name: name || `Agent ${wallet.address.slice(0, 8)}`,
+      description: 'Onboarded via Polygent builder relay',
+      walletAddress: wallet.address,
+      proxyWallet: result.safeAddress!,
+      deposit: 0,
+      config: {},
+      interval: 0,
+      strategy: 'external',
+      version: '1.0.0',
+    });
+
+    logger.info('Agent onboarded successfully', {
+      agentId: agent.id,
+      safe: result.safeAddress,
+    });
+
+    res.status(201).json({
+      agentId: agent.id,
+      apiKey: agent.apiKey,
+      safeAddress: result.safeAddress,
+      approvalsTxHash: result.approvalsTxHash,
+      clobCredentials: result.clobCreds,
+      signEndpoint: 'https://polygent.market/sign',
+      message: 'Agent onboarded. Deposit USDC.e to your Safe address to start trading. Use the signEndpoint in your BuilderConfig for attributed orders.',
+    });
+  } catch (err) {
+    logger.error('Onboard failed', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 export default router;

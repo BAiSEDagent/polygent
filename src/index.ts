@@ -85,6 +85,10 @@ app.use((req, _res, next) => {
 
 app.use('/api', apiRoutes);
 
+// /sign at root for SDK compatibility (BuilderConfig remote URL = "https://polygent.market/sign")
+import builderSignRouter from './api/builder-sign';
+app.use('/sign', builderSignRouter);
+
 // Health check
 app.get('/health', (_req, res) => {
   const stats = liveDataService.getStats();
