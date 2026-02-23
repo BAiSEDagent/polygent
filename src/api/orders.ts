@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { authenticateAgent } from '../utils/auth';
 import { logger } from '../utils/logger';
 import { evaluateRisk } from '../core/risk';
@@ -12,6 +13,16 @@ import { Agent, Order, OrderRequest, Trade, TradeSource } from '../utils/types';
 import { getAgentMutex } from '../utils/mutex';
 import { assertSignerIsAgent, SignedCLOBOrder } from '../utils/verify-signature';
 import { copyEngine } from '../core/copy-engine';
+
+// Rate limit for relay endpoint: 10 requests/sec per API key, 60/min burst
+const relayRateLimit = rateLimit({
+  windowMs: 60_000,
+  max: 60,
+  keyGenerator: (req: Request) => (req as any).agent?.id || req.ip || 'unknown',
+  message: { error: 'Relay rate limit exceeded — max 60 orders/min per agent' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 
@@ -151,7 +162,7 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
  * Headers:
  *   X-API-Key: <polygent agent key>
  */
-router.post('/relay', authenticateAgent, async (req: Request, res: Response) => {
+router.post('/relay', relayRateLimit, authenticateAgent, async (req: Request, res: Response) => {
   const agent = (req as any).agent as Agent;
 
   // External agents must have registered their EOA with Polygent
