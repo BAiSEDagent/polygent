@@ -64,13 +64,22 @@ class AgentRunner extends EventEmitter {
       );
     }
     
+    // SECURITY: Validate deposit amount
+    const deposit = options?.deposit ?? 10_000;
+    if (deposit <= 0 || !isFinite(deposit) || isNaN(deposit)) {
+      throw new Error(`Invalid deposit for agent "${name}": ${deposit}. Must be positive and finite.`);
+    }
+    if (deposit > 10_000_000) {
+      throw new Error(`Invalid deposit for agent "${name}": $${deposit.toLocaleString()}. Exceeds maximum $10M.`);
+    }
+    
     const agent = agentStore.create({
       id: `agent_${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`,
       name,
       apiKeyHash: `internal_${name}`,
       privateKey: dummyPrivateKey, // Paper only - production guard above prevents real use
       walletAddress: '0x0000000000000000000000000000000000000000',
-      deposit: options?.deposit ?? 10_000, // $10K paper money
+      deposit, // Validated above
       configOverrides: {
         maxOrderSize: 100, // Capped — paper-trader enforces $75 hard limit per trade
         maxPositionPct: 0.15,

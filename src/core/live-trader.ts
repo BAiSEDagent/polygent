@@ -46,6 +46,16 @@ export class LiveTrader {
   private dailyOrderCount: number = 0;
   private lastResetDay: number = new Date().getDate();
 
+  /** Atomic daily counter reset (prevents race condition) */
+  private resetDailyCounterIfNeeded(): void {
+    const today = new Date().getDate();
+    if (today !== this.lastResetDay) {
+      this.dailyOrderCount = 0;
+      this.lastResetDay = today;
+      logger.info(`Daily order counter reset (new day: ${today})`);
+    }
+  }
+
   constructor(cfg: LiveTraderConfig) {
     this.config = cfg;
 
@@ -101,12 +111,8 @@ export class LiveTrader {
 
     // === SAFETY GATES (fail closed) ===
 
-    // Reset daily counter
-    const today = new Date().getDate();
-    if (today !== this.lastResetDay) {
-      this.dailyOrderCount = 0;
-      this.lastResetDay = today;
-    }
+    // Reset daily counter (atomic check-and-set to prevent race condition)
+    this.resetDailyCounterIfNeeded();
 
     // Gate 1: Order size
     if (orderValue > this.config.maxOrderSize) {

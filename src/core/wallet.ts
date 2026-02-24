@@ -98,10 +98,16 @@ export async function deployProxyWallet(agentId: string): Promise<string> {
       agentStore.update(agentId, { proxyWallet: config.FUNDER_ADDRESS });
       return config.FUNDER_ADDRESS;
     }
-    if (config.NODE_ENV === 'production') {
-      throw new Error(`Proxy wallet deployment failed for agent ${agentId}. No FUNDER_ADDRESS configured.`);
+    
+    // SECURITY: Only allow EOA fallback in development mode
+    if (config.NODE_ENV !== 'development') {
+      throw new Error(
+        `Proxy wallet deployment failed for agent ${agentId} in ${config.NODE_ENV} mode. ` +
+        `No FUNDER_ADDRESS configured. EOA fallback disabled outside development.`
+      );
     }
-    logger.warn(`Proxy wallet deployment failed, using EOA as fallback`, {
+    
+    logger.warn(`Proxy wallet deployment failed, using EOA as fallback (dev mode only)`, {
       agentId,
       error: (error as Error).message,
     });
