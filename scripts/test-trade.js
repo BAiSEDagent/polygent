@@ -10,8 +10,8 @@ const { ethers } = require('ethers');
 const RPC_URL = 'https://polygon-pokt.nodies.app';
 const CLOB_HOST = 'https://clob.polymarket.com';
 
-// BTC >$109k market (liquidity validated)
-const TOKEN_ID = '21742633143463906290569050155826241533067272736897614950488156847949938836455';
+// Active liquid market: "Will Trump sell 10k-25k Gold Cards in 2026?" (YES token)
+const TOKEN_ID = '58858731796442679222989272055454043286056057669744610936854497026401512278651';
 
 async function placeBuyOrder() {
   const pk = process.env.PK || process.env.PRIVATE_KEY;
