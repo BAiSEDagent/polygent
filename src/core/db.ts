@@ -159,6 +159,24 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_paper_agent ON paper_trades(agent_id);
     CREATE INDEX IF NOT EXISTS idx_paper_strategy ON paper_trades(strategy_name);
     CREATE INDEX IF NOT EXISTS idx_paper_timestamp ON paper_trades(timestamp);
+
+    -- Builder fees: track revenue earned from relay trades
+    CREATE TABLE IF NOT EXISTS builder_fees (
+      id TEXT PRIMARY KEY,
+      trade_id TEXT,
+      market_id TEXT NOT NULL,
+      market_question TEXT,
+      notional_usd REAL NOT NULL,
+      price REAL NOT NULL,
+      taker_fee_usd REAL NOT NULL,
+      builder_fee_usd REAL NOT NULL,
+      builder_fee_share REAL NOT NULL,
+      timestamp INTEGER NOT NULL,
+      FOREIGN KEY (trade_id) REFERENCES trades(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_builder_fees_timestamp ON builder_fees(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_builder_fees_market ON builder_fees(market_id);
   `);
 
   // Safe migration: add maker_fee to existing paper_trades tables that were

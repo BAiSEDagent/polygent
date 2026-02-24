@@ -19,4 +19,5 @@ export const api = {
   getHealth: health,
   getRunners: () => get('/agents'),
   getRunnerTrades: (id: string, limit = 100) => get(`/agents/${id}/trades?limit=${limit}`),
+  getBuilderFees: () => get('/v1/stats/fees'),
 };

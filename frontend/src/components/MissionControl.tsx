@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { INDUSTRIAL_THEME as T } from '../lib/theme';
+import { api } from '../lib/api';
 
 interface MissionControlProps {
   activities: any[];
@@ -7,6 +8,23 @@ interface MissionControlProps {
 }
 
 export function MissionControl({ activities, agents }: MissionControlProps) {
+  const [builderFees, setBuilderFees] = useState<number>(0);
+
+  // Fetch builder fees on mount and every 10 seconds
+  useEffect(() => {
+    const fetchFees = async () => {
+      try {
+        const data = await api.getBuilderFees();
+        setBuilderFees(data.totalUsd || 0);
+      } catch (err) {
+        console.error('Failed to fetch builder fees:', err);
+      }
+    };
+    fetchFees();
+    const interval = setInterval(fetchFees, 10_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const stats = useMemo(() => {
     let volume = 0, pnlSum = 0, pnlCount = 0, trades24h = 0;
     const cutoff = Date.now() - 86400000;
@@ -36,6 +54,11 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
       value: `${pnlPos ? '+' : ''}${stats.pnl.toFixed(2)}%`,
       color: pnlColor, energyBar: false, glow: true,
     },
+    {
+      label: 'BUILDER FEES',
+      value: `$${builderFees.toFixed(4)}`,
+      color: T.color.green, energyBar: false, glow: true,
+    },
   ];
 
   return (
@@ -52,7 +75,7 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
       <div
         style={{
           display:             'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(5, 1fr)',
           backgroundColor:     '#050505',           // solid black bar
           borderBottom:        '1px solid rgba(255,255,255,0.10)',
           // P&L ambient glow spills downward

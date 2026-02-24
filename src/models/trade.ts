@@ -1,5 +1,6 @@
 import { Order, Trade, OrderStatus, Position } from '../utils/types';
 import { sanitizeObject } from '../utils/sanitize';
+import { calcTakerFee, calcBuilderFee, recordBuilderFee, getBuilderFeeShare } from '../utils/builder-fees';
 
 const MAX_TRADES = 50_000;
 const MAX_PAPER_TRADES = 50_000;
@@ -50,6 +51,25 @@ class TradeStore {
     this.trades.push(trade);
     if (this.trades.length > MAX_TRADES) {
       this.trades = this.trades.slice(-MAX_TRADES);
+    }
+
+    // Record builder fee for this trade (live trades only)
+    if (trade.source === 'live') {
+      const notional = trade.amount * trade.price;
+      const takerFee = calcTakerFee(notional, trade.price);
+      const builderFee = calcBuilderFee(takerFee);
+
+      recordBuilderFee({
+        id: `fee_${trade.id}`,
+        tradeId: trade.id,
+        marketId: trade.marketId,
+        notionalUsd: notional,
+        price: trade.price,
+        takerFeeUsd: takerFee,
+        builderFeeUsd: builderFee,
+        builderFeeShare: getBuilderFeeShare(),
+        timestamp: trade.timestamp,
+      });
     }
   }
 

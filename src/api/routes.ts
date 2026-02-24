@@ -13,6 +13,7 @@ import { tradeStore } from '../models/trade';
 import { fullSetArbObserver } from '../services/fullset-observer';
 import { authenticateAgent, requireAdmin } from '../utils/auth';
 import { safeParseInt } from '../utils/sanitize';
+import { getTotalBuilderFees, getDailyBuilderFees, getBuilderFeeShare } from '../utils/builder-fees';
 
 const router = Router();
 
@@ -116,6 +117,22 @@ router.get('/fullset/opportunities', (req: Request, res: Response) => {
   const universe = req.query.universe as string | undefined;
   const limit = safeParseInt(req.query.limit as string, 50);
   res.json({ opportunities: fullSetArbObserver.getCompletedOpps(universe, limit) });
+});
+
+// ─── Builder Fee Stats ────────────────────────────────────────────────────────
+
+/** GET /api/v1/stats/fees — Get total builder fees earned + daily breakdown */
+router.get('/v1/stats/fees', (_req: Request, res: Response) => {
+  const totalUsd = getTotalBuilderFees();
+  const dailyBreakdown = getDailyBuilderFees(30);
+  const builderFeeShare = getBuilderFeeShare();
+
+  res.json({
+    totalUsd,
+    dailyBreakdown,
+    builderFeeShare,
+    note: 'Builder fees are estimated based on BUILDER_FEE_SHARE env var (default: 0.20 = 20% of taker fees)',
+  });
 });
 
 export default router;
