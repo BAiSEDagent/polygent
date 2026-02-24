@@ -42,10 +42,10 @@ async function placeBuyOrder() {
   if (!bestAsk) throw new Error('No asks available');
 
   const price = parseFloat(bestAsk.price);
-  const size = (1.0 / price).toFixed(2); // $1 notional
+  const size = (1.01 / price).toFixed(3); // $1.01 notional to meet $1 min
 
   console.log('   Best ask:', price);
-  console.log('   Size:', size, 'shares (~$1.00 notional)');
+  console.log('   Size:', size, 'shares ($' + (price * parseFloat(size)).toFixed(2) + ' notional)');
   console.log('');
 
   console.log('📝 Building order payload...');
