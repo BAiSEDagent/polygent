@@ -27,8 +27,8 @@ const tradeData = {
 try {
   // Insert order first (trades table has FK constraint)
   const insertOrder = db.prepare(`
-    INSERT OR IGNORE INTO orders (id, agent_id, market_id, side, outcome, amount, price, status, timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO orders (id, agent_id, market_id, side, outcome, amount, price, status, filled_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   insertOrder.run(
@@ -40,6 +40,8 @@ try {
     tradeData.amount,
     tradeData.price,
     'FILLED',
+    tradeData.amount,
+    tradeData.timestamp,
     tradeData.timestamp
   );
 
