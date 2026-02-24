@@ -60,45 +60,39 @@ async function placeBuyOrder() {
   });
 
   console.log('📤 Submitting order to matching engine...');
+  console.log('Payload:', JSON.stringify(orderPayload, null, 2));
   const order = await clob.postOrder(orderPayload);
 
-  console.log('✅ Order placed!');
-  console.log('   Order ID:', order.orderID);
-  console.log('');
+  console.log('✅ POST response:', JSON.stringify(order, null, 2));
+  
+  // Check if order was created via API
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  const response = await fetch(`https://clob.polymarket.com/data/orders?maker=${wallet.address}`, {
+    headers: { 'Accept': 'application/json' }
+  });
+  const { data: orders } = await response.json();
+  
+  if (orders && orders.length > 0) {
+    const latest = orders[orders.length - 1];
+    console.log('Latest order from API:');
+    console.log('   Order ID:', latest.id);
+    console.log('   Status:', latest.status);
+    console.log('   Price:', latest.price);
+    console.log('   Size:', latest.size);
+    console.log('');
 
-  // Wait for fill
-  console.log('⏳ Waiting for fill...');
-  let filled = false;
-  let attempts = 0;
-
-  while (!filled && attempts < 30) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const status = await clob.getOrder(order.orderID);
-    
-    if (status.status === 'MATCHED' || status.status === 'FILLED') {
-      filled = true;
+    if (latest.status === 'MATCHED' || latest.status === 'FILLED') {
       console.log('✅ Order filled!');
-      console.log('   Status:', status.status);
-      console.log('   Price:', status.price);
-      console.log('   Size filled:', status.sizeFilled);
-      console.log('');
-      
-      // Check if fee was recorded
-      console.log('🧮 Checking fee tracking...');
-      const takerFee = parseFloat(status.price) * parseFloat(status.sizeFilled) * 0.0025;
+      const takerFee = parseFloat(latest.price) * parseFloat(latest.size_matched || latest.size) * 0.0025;
       const builderFee = takerFee * 0.2;
-      console.log('   Taker fee:', takerFee.toFixed(6), 'USDC');
+      console.log('🧮 Taker fee:', takerFee.toFixed(6), 'USDC');
       console.log('   Builder fee (20%):', builderFee.toFixed(6), 'USDC');
-      break;
+    } else {
+      console.log('⚠️  Order status:', latest.status);
+      console.log('   Check https://polymarket.com');
     }
-
-    attempts++;
-  }
-
-  if (!filled) {
-    console.log('⚠️  Order not filled after 60s');
-    console.log('   Order ID:', order.orderID);
-    console.log('   Check status manually on Polymarket UI');
+  } else {
+    console.log('⚠️  No orders found');
   }
 }
 
