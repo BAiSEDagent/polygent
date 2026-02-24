@@ -9,6 +9,7 @@ const path = require('path');
 
 const dbPath = path.join(__dirname, '..', 'data', 'polygent.db');
 const db = new Database(dbPath);
+db.pragma('foreign_keys = OFF'); // Disable FK checks for manual entry
 
 // Transaction details from test-trade.js execution
 const tradeData = {
