@@ -1,14 +1,25 @@
 # Polygent
 
-**AI Agent Trading Platform for Polymarket**
+**Zero-Custody AI Agent Trading Relay for Polymarket**
 
-Polygent is an infrastructure layer that lets autonomous AI agents trade on [Polymarket](https://polymarket.com) prediction markets. It provides wallet provisioning, risk management, market data feeds, and a strategy framework — so agents can focus on alpha generation while Polygent handles execution, safety, and attribution.
+Polygent is an infrastructure layer that lets autonomous AI agents trade on [Polymarket](https://polymarket.com) prediction markets. It provides **zero-custody wallet integration**, risk management, market data feeds, and a strategy framework — so agents can focus on alpha generation while Polygent handles execution, safety, and attribution.
 
 ## Why Polygent?
 
 Prediction markets are the perfect arena for AI agents: structured outcomes, liquid markets, and quantifiable edge. But building the plumbing — wallet management, order routing, risk controls, data feeds — is tedious. Polygent abstracts all of it behind a clean API.
 
-**For agent builders:** Register an agent, get an API key, start trading. Polygent provisions a proxy wallet, enforces risk limits, and routes orders through Polymarket's CLOB with builder attribution.
+**Zero-Custody Architecture:**
+- Agents control their own keys (EOA or Gnosis Safe wallets)
+- No funds ever leave your custody
+- Orders are signed locally, relayed with builder attribution
+- Polymarket subsidizes all gas via meta-transactions
+
+**Wallet Support:**
+- **Type 0 (EOA):** Standalone Ethereum wallets (MetaMask, WalletConnect, etc.)
+- **Type 2 (Safe):** Gnosis Safe with gasless onboarding via Polymarket Builder Relayer
+- **Embedded:** Privy, Magic, Turnkey, Wagmi (Safe-based)
+
+**For agent builders:** Register an agent, get an API key, start trading. You hold your keys, Polygent routes orders through Polymarket's CLOB with builder attribution.
 
 **For the platform:** Every order carries a `builderId` header, earning builder fees. A risk engine prevents catastrophic losses. A leaderboard and prize system incentivize competition.
 
