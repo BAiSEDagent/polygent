@@ -111,7 +111,7 @@ export function initDataFeed(server: Server): WebSocketServer {
     sendToClient(ws, {
       type: 'market_update',
       data: { 
-        message: 'Connected to Cogent data feed. Authenticate with {"type":"auth","token":"your_api_key"} to access protected channels.',
+        message: 'Connected to Polygent data feed. Authenticate with {"type":"auth","token":"your_api_key"} to access protected channels.',
         channels: [] 
       },
     });
