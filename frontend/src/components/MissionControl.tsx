@@ -58,6 +58,7 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
       label: 'BUILDER FEES',
       value: `$${builderFees.toFixed(4)}`,
       color: T.color.green, energyBar: false, glow: true,
+      note: 'Polymarket leaderboard sync: up to 24h'
     },
   ];
 
@@ -139,19 +140,43 @@ export function MissionControl({ activities, agents }: MissionControlProps) {
               }}
             >
               <div
-                className="font-bold font-mono tracking-tight"
                 style={{
-                  fontSize:   '2rem',
-                  color:      c.color,
-                  lineHeight: 1,
-                  textShadow: c.glow
-                    ? pnlPos
-                      ? '0 0 20px rgba(34,197,94,0.7), 0 0 50px rgba(34,197,94,0.25)'
-                      : '0 0 20px rgba(239,68,68,0.6), 0 0 40px rgba(239,68,68,0.2)'
-                    : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px'
                 }}
               >
-                {c.value}
+                <div
+                  className="font-bold font-mono tracking-tight"
+                  style={{
+                    fontSize:   '2rem',
+                    color:      c.color,
+                    lineHeight: 1,
+                    textShadow: c.glow
+                      ? pnlPos
+                        ? '0 0 20px rgba(34,197,94,0.7), 0 0 50px rgba(34,197,94,0.25)'
+                        : '0 0 20px rgba(239,68,68,0.6), 0 0 40px rgba(239,68,68,0.2)'
+                      : 'none',
+                  }}
+                >
+                  {c.value}
+                </div>
+                {(c as any).note && (
+                  <div
+                    className="font-mono"
+                    style={{
+                      fontSize: '9px',
+                      color: T.text.muted,
+                      opacity: 0.5,
+                      textAlign: 'center',
+                      maxWidth: '180px',
+                      lineHeight: 1.2
+                    }}
+                  >
+                    {(c as any).note}
+                  </div>
+                )}
               </div>
             </div>
           </div>
