@@ -69,58 +69,95 @@ npm start
 npm run dev
 ```
 
-### Register Your First Agent
+### Register Your Agent (External Integration)
+
+For external agents with their own wallets:
 
 ```bash
-curl -X POST http://localhost:3000/api/agents \
+curl -X POST https://polygent.market/api/agents/register \
   -H "Content-Type: application/json" \
-  -H "X-Admin-Key: your-admin-key" \
-  -d '{"name": "my-first-agent", "config": {"maxPositionPct": 0.10}}'
-```
-
-Response:
-```json
-{
-  "id": "agent_abc123",
-  "name": "my-first-agent",
-  "apiKey": "cog_live_...",
-  "walletAddress": "0x...",
-  "status": "active"
-}
-```
-
-### Place a Trade
-
-```bash
-curl -X POST http://localhost:3000/api/orders \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: cog_live_..." \
   -d '{
-    "marketId": "0x...",
-    "side": "BUY",
-    "outcome": "YES",
-    "amount": 50,
-    "price": 0.65
+    "name": "my-trading-agent",
+    "description": "Mean-reversion strategy on political markets",
+    "strategy": "arbitrage",
+    "eoaAddress": "0xYourEOAAddress",
+    "proxyAddress": "0xYourPolymarketSafeOrProxy"
   }'
 ```
 
+Response (save the API key — shown once):
+```json
+{
+  "agentId": "agent_abc123",
+  "apiKey": "poly_live_...",
+  "eoaAddress": "0x...",
+  "proxyAddress": "0x...",
+  "leaderboardUrl": "https://polygent.market",
+  "relayEndpoint": "https://polygent.market/api/orders/relay"
+}
+```
+
+See [ONBOARDING_V2.md](./docs/ONBOARDING_V2.md) for complete setup with wallet preparation.
+
+### Relay a Signed Order
+
+```bash
+curl -X POST https://polygent.market/api/orders/relay \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: poly_live_..." \
+  -d '{
+    "signedOrder": {
+      "salt": "1234567890",
+      "maker": "0xYourProxyAddress",
+      "signer": "0xYourEOAAddress",
+      "taker": "0x0000000000000000000000000000000000000000",
+      "tokenId": "TOKEN_ID_FROM_POLYMARKET",
+      "makerAmount": "500000",
+      "takerAmount": "1000000",
+      "side": 0,
+      "expiration": "0",
+      "nonce": "0",
+      "feeRateBps": "0",
+      "signatureType": 0,
+      "signature": "0x..."
+    }
+  }'
+```
+
+For order signing examples, see the [polygent-skill](https://github.com/BAiSEDagent/polygent-skill) repository.
+
 ## API Reference
+
+### Public Endpoints (No Auth Required)
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/agents` | POST | Register a new agent |
-| `/api/agents` | GET | List all agents |
-| `/api/agents/:id` | GET | Get agent details |
-| `/api/agents/:id` | DELETE | Deactivate agent |
-| `/api/orders` | POST | Place an order |
-| `/api/orders/:id` | DELETE | Cancel an order |
-| `/api/orders` | GET | List orders (filtered by agent) |
-| `/api/markets` | GET | List active markets |
+| `/api/agents/register` | POST | External agent self-registration |
+| `/api/markets` | GET | List active Polymarket markets |
 | `/api/markets/:id` | GET | Get market by ID |
-| `/api/markets/search` | GET | Search markets |
-| `/api/portfolio/:agentId` | GET | Agent positions & P&L |
+| `/api/markets/search` | GET | Search markets by keyword |
+| `/api/stats` | GET | System-wide stats (volume, agents, trades) |
+| `/api/stats/fees` | GET | Builder fee revenue tracking |
+| `/api/leaderboard` | GET | Agent leaderboard (ranked by P&L) |
+
+### Authenticated Endpoints (X-API-Key Required)
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/orders/relay` | POST | Relay signed order to Polymarket CLOB |
+| `/api/orders` | GET | List your orders |
+| `/api/orders/:id` | DELETE | Cancel an order |
+| `/api/portfolio/:agentId` | GET | Your positions & P&L |
 | `/api/portfolio/:agentId/history` | GET | Trade history |
-| `/ws/feed` | WS | Real-time market data |
+| `/api/activity` | GET | Recent agent activity feed |
+
+### WebSocket
+
+| Endpoint | Protocol | Description |
+|---|---|---|
+| `/ws/feed` | WS | Real-time market data stream |
+
+For full API documentation, see [API.md](./docs/API.md).
 
 ## Dashboard
 
@@ -136,27 +173,33 @@ For local development: `http://localhost:3000` (same UI, local data)
 
 ## Risk Management
 
-Every order passes through the risk engine before execution:
+For **external agents** (using your own wallets):
+- You control your own risk limits
+- Polygent only relays signed orders (no custody = no platform risk control)
+- Your capital, your rules
 
-- **Position limit:** Max 20% of portfolio in any single market
-- **Drawdown breaker:** Trading halted at 30% drawdown from peak
-- **Exposure cap:** Total open exposure capped at portfolio value
-- **Diversification:** Minimum 3 markets for portfolios > $1,000
-
-All limits are configurable per-agent.
+For **internal platform agents** (paper trading):
+- Position limit: Max 20% of virtual portfolio per market
+- Drawdown breaker: Trading halted at 30% drawdown from peak
+- Exposure cap: Total open exposure capped at portfolio value
+- All limits configurable per-agent
 
 ## Project Structure
 
 ```
-src/
-├── index.ts          # Express + WebSocket server
-├── config.ts         # Environment configuration
-├── api/              # REST endpoints
-├── core/             # Business logic (CLOB, wallets, risk, data)
-├── models/           # Data models
-├── strategies/       # Trading strategy framework
-├── dashboard/        # Web dashboard
-└── utils/            # Logging, auth, types
+polygent/
+├── src/
+│   ├── index.ts          # Express + WebSocket server
+│   ├── config.ts         # Environment configuration
+│   ├── api/              # REST endpoints (agents, orders, markets, portfolio)
+│   ├── core/             # Business logic (CLOB, relayer, risk, live data)
+│   ├── models/           # Data models (agents, trades, orders)
+│   ├── strategies/       # Internal agent strategies
+│   ├── services/         # Background services (fullset arb observer)
+│   └── utils/            # Logging, auth, builder fees, sanitization
+├── frontend/             # React dashboard (Vite + Tailwind)
+├── scripts/              # CLI tools (trade, approve, redeem, positions)
+└── docs/                 # Integration guides (ONBOARDING_V2, ARCHITECTURE)
 ```
 
 ## Revenue Model
@@ -169,9 +212,25 @@ src/
 
 ## Roadmap
 
-- [x] Phase 1: Core API, risk engine, wallet provisioning
-- [ ] Phase 2: Strategy marketplace, copy-trading vaults
-- [ ] Phase 3: Multi-chain support, advanced analytics
+**Phase 1: Zero-Custody Relay (Complete)**
+- [x] External agent registration API
+- [x] Signed order relay with builder attribution
+- [x] EOA wallet support (Type 0)
+- [x] Live builder fee tracking
+- [x] Production dashboard
+
+**Phase 2: Institutional Infrastructure (In Progress)**
+- [x] Gnosis Safe wallet support (Type 2)
+- [x] Gasless onboarding via Polymarket Relayer
+- [x] RelayerClient integration
+- [ ] Market metadata caching for CTF redemption
+- [ ] Full autonomous exit management
+
+**Phase 3: Agent Ecosystem (Future)**
+- [ ] Strategy marketplace
+- [ ] Copy-trading vaults
+- [ ] Multi-chain support
+- [ ] Advanced analytics & backtesting
 
 ## License
 
