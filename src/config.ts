@@ -37,6 +37,7 @@ function getAdminApiKey(): string {
   // Development mode: generate random key if not set
   if (!adminKey || adminKey === 'dev-admin-key') {
     const randomKey = generateRandomKey();
+    // Note: logger not available yet at config load time, so console is appropriate here
     console.log(`🔑 Dev admin key: ${randomKey.slice(0, 8)}...`);
     return randomKey;
   }

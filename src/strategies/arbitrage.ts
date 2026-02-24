@@ -34,8 +34,8 @@ import { safeParseFloat } from '../utils/sanitize';
  *   - Any cross-event, cross-category, or cross-subject matching
  *
  * FOK NOTE: Fill-or-Kill execution is required for multi-leg live trades
- *   to eliminate legging risk. TODO(live-mode): add FOK flag to OrderManager
- *   when TRADING_MODE=live. Not needed in paper mode (no real execution).
+ *   to eliminate legging risk. FOK implementation required before live trading.
+ *   SECURITY: Multi-leg arb without FOK creates directional exposure risk.
  */
 
 interface IndexedMarket {
@@ -54,6 +54,9 @@ export class ArbitrageStrategy extends BaseStrategy {
 
   // Intra-market spread: YES + NO must be ≤ 1.0 − MIN_SPREAD
   private readonly SPREAD_MIN              = 0.02;
+  
+  // Confidence calculation multiplier for spread → confidence mapping
+  private readonly CONFIDENCE_SPREAD_MULTIPLIER = 3.0; // spread * 3 → confidence boost
 
   // Same-event sum-to-one: fire when total YES across event < this
   private readonly EVENT_SUM_THRESHOLD     = 0.90;
@@ -127,9 +130,18 @@ export class ArbitrageStrategy extends BaseStrategy {
 
     const outcome    = yesPrice <= noPrice ? 'YES' as const : 'NO' as const;
     const price      = outcome === 'YES' ? yesPrice : noPrice;
-    const confidence = Math.min(0.95, 0.70 + spread * 3);
+    const confidence = Math.min(0.95, 0.70 + spread * this.CONFIDENCE_SPREAD_MULTIPLIER);
 
     logger.info(`💰 Spread arb: "${market.question.slice(0, 50)}" YES+NO=${total.toFixed(4)} spread=${(spread * 100).toFixed(2)}%`);
+    
+    // SECURITY WARNING: Multi-leg arb without FOK creates legging risk in live mode
+    const { config } = await import('../config');
+    if (config.TRADING_MODE === 'live') {
+      logger.warn(
+        `⚠️  Arb signal in LIVE mode without FOK support! Risk: partial fill creates directional exposure. ` +
+        `Implement Fill-or-Kill before executing multi-leg strategies.`
+      );
+    }
 
     return this.createSignal(market.id, {
       tokenId:        market.tokenIds?.[0],
