@@ -48,8 +48,8 @@ async function placeBuyOrder() {
   console.log('   Size:', size, 'shares (~$1.00 notional)');
   console.log('');
 
-  console.log('📝 Placing BUY order...');
-  const order = await clob.createOrder({
+  console.log('📝 Building order payload...');
+  const orderPayload = await clob.createOrder({
     tokenID: TOKEN_ID,
     price: price,
     size: parseFloat(size),
@@ -58,6 +58,9 @@ async function placeBuyOrder() {
     nonce: Date.now(),
     expiration: Math.floor(Date.now() / 1000) + 86400, // 24h
   });
+
+  console.log('📤 Submitting order to matching engine...');
+  const order = await clob.postOrder(orderPayload);
 
   console.log('✅ Order placed!');
   console.log('   Order ID:', order.orderID);
