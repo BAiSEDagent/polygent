@@ -60,6 +60,9 @@ export class ArbitrageStrategy extends BaseStrategy {
   // Duplicate listing: minimum price gap between near-identical markets
   private readonly DUPLICATE_MIN_GAP       = 0.05;
 
+  // Polymarket tick bounds (avoid generating unplaceable orders)
+  private readonly MIN_POLY_PRICE          = 0.01;
+
   // Duplicate listing text gate
   private readonly SIMILARITY_THRESHOLD    = 0.92;
   private readonly NUMBER_TOLERANCE        = 0.05;
@@ -178,6 +181,13 @@ export class ArbitrageStrategy extends BaseStrategy {
     if (cheapest.id !== market.id) return null;
 
     const yesPrice   = cheapest.prices[0] ?? 0.5;
+    if (yesPrice < this.MIN_POLY_PRICE) {
+      logger.info(
+        `⏭️ Same-event arb skipped: cheapest price ${yesPrice.toFixed(4)} < ${this.MIN_POLY_PRICE.toFixed(2)}`
+      );
+      return null;
+    }
+
     const size       = Math.min(
       context.agent.equity.current * 0.01,
       context.agent.config.maxOrderSize,
@@ -257,6 +267,12 @@ export class ArbitrageStrategy extends BaseStrategy {
         const isCheaper = yesPrice < otherYes;
         const outcome   = isCheaper ? 'YES' as const : 'NO' as const;
         const price     = isCheaper ? yesPrice : 1 - yesPrice;
+        if (price < this.MIN_POLY_PRICE || price > 0.99) {
+          logger.info(
+            `⏭️ Duplicate arb skipped: computed price ${price.toFixed(4)} outside [${this.MIN_POLY_PRICE.toFixed(2)}, 0.99]`
+          );
+          continue;
+        }
         const size      = Math.min(context.agent.equity.current * 0.01, context.agent.config.maxOrderSize);
         if (size < 1) continue;
 
