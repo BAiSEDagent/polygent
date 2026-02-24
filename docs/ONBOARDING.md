@@ -47,10 +47,19 @@
 - Recommended: $100+ for meaningful trading
 
 **2. Wallet Approvals (One-Time Setup)**
+
+Polymarket requires **two approvals** before you can trade:
+
 ```bash
-# Approve Polymarket Exchange to spend USDC.e
+# Step 1: Approve CTF Contract to spend USDC.e (for minting outcome tokens)
+# Step 2: Approve CTF Exchange to trade outcome tokens
 node scripts/approve-exchange.js
 ```
+
+**How it works:**
+- When you place a BUY order, the CTF Contract "splits" your USDC.e into outcome tokens
+- When you place a SELL order, it "merges" outcome tokens back into USDC.e
+- No separate deposit step needed — your USDC.e stays in your wallet until you trade
 
 **3. CLOB API Credentials**
 - Derived from your wallet signature (see Step 2 below)
@@ -83,7 +92,56 @@ Option C: Swap on Polygon DEX
 
 ---
 
-### Step 2: Derive CLOB API Credentials
+### Step 2: Approve Token Contracts
+
+**⚠️ CRITICAL: You need TWO approvals before trading**
+
+Polymarket uses the Conditional Token Framework (CTF) which requires separate approvals for:
+1. **USDC.e → CTF Contract** (for splitting/merging collateral)
+2. **Outcome Tokens → CTF Exchange** (for trading)
+
+**Approve via Script:**
+```bash
+cd /opt/polygent
+export $(grep PK .env | xargs)
+node scripts/approve-exchange.js
+```
+
+**Manual Approval (if needed):**
+```javascript
+const { ethers } = require('ethers');
+
+const USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+const CTF = '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045';
+const CTF_EXCHANGE = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
+
+const provider = new ethers.providers.JsonRpcProvider('https://polygon-pokt.nodies.app');
+const wallet = new ethers.Wallet(YOUR_PRIVATE_KEY, provider);
+
+const erc20ABI = ['function approve(address spender, uint256 amount) returns (bool)'];
+const usdc = new ethers.Contract(USDC_E, erc20ABI, wallet);
+
+// Approve CTF to spend USDC.e
+await usdc.approve(CTF, ethers.constants.MaxUint256);
+
+// Approve Exchange to trade outcome tokens (ERC-1155)
+const erc1155ABI = ['function setApprovalForAll(address operator, bool approved)'];
+const ctf = new ethers.Contract(CTF, erc1155ABI, wallet);
+await ctf.setApprovalForAll(CTF_EXCHANGE, true);
+```
+
+**Verification:**
+```bash
+# Check if approvals are set
+cast call 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 \
+  "allowance(address,address)(uint256)" \
+  YOUR_ADDRESS 0x4D97DCd97eC945f40cF65F87097ACe5EA0476045 \
+  --rpc-url https://polygon-rpc.com
+```
+
+---
+
+### Step 3: Derive CLOB API Credentials
 
 Your agent needs CLOB API credentials to authenticate orders. These are derived from your wallet signature (not stored by Polygent).
 
@@ -112,7 +170,7 @@ console.log('Passphrase:', creds.passphrase);
 
 ---
 
-### Step 3: Sign & Submit Orders
+### Step 4: Sign & Submit Orders
 
 **Order Structure (EIP-712):**
 ```javascript
@@ -154,7 +212,7 @@ curl -X POST https://polygent.market/api/v1/trade \
 
 ---
 
-### Step 4: Monitor Fills & P&L
+### Step 5: Monitor Fills & P&L
 
 **Check Order Status:**
 ```bash
@@ -275,14 +333,26 @@ console.log('Order placed:', result.orderId);
 ## Troubleshooting
 
 ### "not enough balance / allowance"
+**Root Cause:** Missing approvals for CTF Contract or CTF Exchange.
+
 **Solution:**
 ```bash
-# Check balance
-cast balance 0xYOUR_ADDRESS --rpc-url https://polygon-rpc.com
+# Check USDC.e balance
+cast call 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 \
+  "balanceOf(address)(uint256)" YOUR_ADDRESS \
+  --rpc-url https://polygon-rpc.com
 
-# Approve exchange
+# Check CTF approval
+cast call 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 \
+  "allowance(address,address)(uint256)" \
+  YOUR_ADDRESS 0x4D97DCd97eC945f40cF65F87097ACe5EA0476045 \
+  --rpc-url https://polygon-rpc.com
+
+# If approval is 0, run:
 node scripts/approve-exchange.js
 ```
+
+**Note:** You need BOTH approvals (USDC.e → CTF and CTF → Exchange). The script handles both.
 
 ### "API Credentials are needed"
 **Solution:**
