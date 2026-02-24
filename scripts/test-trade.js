@@ -29,11 +29,11 @@ async function placeBuyOrder() {
   console.log('🎯 Market: BTC >$109k (token ID:', TOKEN_ID, ')');
   console.log('');
 
-  const clob = new ClobClient(CLOB_HOST, wallet.address, {
+  const clob = new ClobClient(CLOB_HOST, 137, wallet, {
     key: apiKey,
     secret,
     passphrase,
-  }, wallet);
+  });
 
   // Place BUY order for $1.00 notional at current best ask
   console.log('📊 Fetching order book...');
