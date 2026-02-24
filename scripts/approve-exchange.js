@@ -26,7 +26,7 @@ async function approveExchange() {
   const pk = process.env.PK || process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PK or PRIVATE_KEY env var required');
 
-  const provider = new ethers.JsonRpcProvider(POLYGON_RPC);
+  const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC);
   const wallet = new ethers.Wallet(pk, provider);
   const usdc = new ethers.Contract(USDC_E, ERC20_ABI, wallet);
 
