@@ -286,7 +286,14 @@ class FullSetArbObserver {
             downTokenId: tokenIds[1],
             endDate: String(m.endDate ?? ''),
           };
-        } catch { /* try fallback */ }
+        } catch (err: unknown) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          logger.debug(`Universe market fetch failed for ${slug}`, { 
+            universe, 
+            error: error.message 
+          });
+          continue; // Try next timestamp slot
+        }
       }
       return null;
     });
@@ -385,7 +392,13 @@ class FullSetArbObserver {
             market.marketId, market.universe, market.question.slice(0, 200),
             opp.startedAt, now, durationMs, opp.maxEdgeBps, rawCost
           );
-        } catch { /* ignore */ }
+        } catch (err: unknown) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          logger.warn('Failed to persist completed opportunity', { 
+            marketId: market.marketId, 
+            error: error.message 
+          });
+        }
 
         logger.info(
           `📊 FullSetArb opp CLOSED: ${market.universe} duration=${durationMs}ms ` +
@@ -405,7 +418,13 @@ class FullSetArbObserver {
           now, market.universe, market.marketId, market.question.slice(0, 200),
           askUp, askDown, rawCost, edgeBps, depthUpUsd, depthDownUsd
         );
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.debug('Failed to persist snapshot', { 
+          marketId: market.marketId, 
+          error: error.message 
+        });
+      }
     }
   }
 
@@ -550,7 +569,9 @@ class FullSetArbObserver {
       return universe
         ? stmt.all(universe, limit) as object[]
         : stmt.all(limit) as object[];
-    } catch {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.warn('Failed to query snapshots', { universe, error: error.message });
       return [];
     }
   }
@@ -564,7 +585,9 @@ class FullSetArbObserver {
       return universe
         ? stmt.all(universe, limit) as object[]
         : stmt.all(limit) as object[];
-    } catch {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.warn('Failed to query opportunities', { universe, error: error.message });
       return [];
     }
   }

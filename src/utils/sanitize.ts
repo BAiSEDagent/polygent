@@ -7,6 +7,44 @@
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const MAX_DEPTH = 10;
 
+/**
+ * Safe parseFloat wrapper that validates output.
+ * Returns fallback value if input is invalid or results in NaN/Infinity.
+ * 
+ * SECURITY: Prevents NaN injection attacks in price/quantity calculations.
+ * @param val - String value to parse
+ * @param fallback - Safe default to return on parse failure
+ * @returns Validated float or fallback
+ */
+export function safeParseFloat(val: string | number | any, fallback: number): number {
+  if (typeof val === 'number') {
+    return isFinite(val) && !isNaN(val) ? val : fallback;
+  }
+  if (typeof val !== 'string') return fallback;
+  
+  const parsed = parseFloat(val);
+  return isFinite(parsed) && !isNaN(parsed) ? parsed : fallback;
+}
+
+/**
+ * Safe parseInt wrapper with radix enforcement.
+ * Always uses base 10 to prevent octal/hex confusion.
+ * 
+ * @param val - String value to parse
+ * @param fallback - Safe default to return on parse failure
+ * @returns Validated integer or fallback
+ */
+export function safeParseInt(val: string | number | any, fallback: number): number {
+  if (typeof val === 'number') {
+    const int = Math.floor(val);
+    return isFinite(int) && !isNaN(int) ? int : fallback;
+  }
+  if (typeof val !== 'string') return fallback;
+  
+  const parsed = parseInt(val, 10);
+  return isFinite(parsed) && !isNaN(parsed) ? parsed : fallback;
+}
+
 export function sanitizeObject<T extends Record<string, any>>(obj: T, depth: number = 0): T {
   if (obj === null || obj === undefined || typeof obj !== 'object') {
     return obj;

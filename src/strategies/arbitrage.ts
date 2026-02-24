@@ -1,6 +1,7 @@
 import { BaseStrategy } from './base';
 import { Market, Signal, StrategyContext } from '../utils/types';
 import { logger } from '../utils/logger';
+import { safeParseFloat } from '../utils/sanitize';
 
 /**
  * Arbitrage Strategy v2.1.0 — Institutional Logic Edition
@@ -357,8 +358,8 @@ export class ArbitrageStrategy extends BaseStrategy {
 
   private extractNumbers(q: string): number[] {
     return (q.match(/[\d,]+\.?\d*/g) ?? [])
-      .map(m => parseFloat(m.replace(/,/g, '')))
-      .filter(n => !isNaN(n) && n > 0);
+      .map(m => safeParseFloat(m.replace(/,/g, ''), 0))
+      .filter(n => n > 0);
   }
 
   private numbersMatch(a: number[], b: number[]): boolean {

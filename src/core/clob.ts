@@ -3,6 +3,7 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { Order, OrderRequest, OrderSide, OrderOutcome } from '../utils/types';
 import { deployProxyWallet, signOrder } from './wallet';
+import { safeParseFloat } from '../utils/sanitize';
 
 /**
  * CLOB client — wraps Polymarket's CLOB REST API.
@@ -108,8 +109,8 @@ class CLOBClient {
   /** Get best bid/ask for a token */
   async getMidpoint(tokenId: string): Promise<number> {
     const book = await this.getOrderbook(tokenId);
-    const bestBid = book.bids.length > 0 ? parseFloat(book.bids[0].price) : 0;
-    const bestAsk = book.asks.length > 0 ? parseFloat(book.asks[0].price) : 1;
+    const bestBid = book.bids.length > 0 ? safeParseFloat(book.bids[0].price, 0) : 0;
+    const bestAsk = book.asks.length > 0 ? safeParseFloat(book.asks[0].price, 1) : 1;
     return (bestBid + bestAsk) / 2;
   }
 
@@ -122,10 +123,23 @@ class CLOBClient {
     // Ensure proxy wallet is deployed
     const proxyWallet = await deployProxyWallet(agentId);
 
-    // Check slippage protection for limit orders
+    // SECURITY: Check slippage protection for limit orders
+    // Fetch midpoint immediately before order construction to minimize staleness
     if (request.type !== 'MARKET') {
+      const slippageCheckStart = Date.now();
       try {
         const currentMidpoint = await this.getMidpoint(request.marketId);
+        const slippageCheckDuration = Date.now() - slippageCheckStart;
+        
+        // Reject if price fetch took too long (stale data)
+        if (slippageCheckDuration > 500) {
+          logger.warn(`Slippage check took ${slippageCheckDuration}ms (>500ms) — market data may be stale`, {
+            agentId,
+            marketId: request.marketId
+          });
+          throw new Error(`Order rejected: market data fetch took ${slippageCheckDuration}ms (>500ms threshold). Stale price protection.`);
+        }
+        
         const priceDiff = Math.abs(request.price - currentMidpoint);
         const slippagePct = priceDiff / currentMidpoint;
         
@@ -136,7 +150,7 @@ class CLOBClient {
           );
         }
         
-        logger.debug(`Slippage check passed`, {
+        logger.debug(`Slippage check passed (${slippageCheckDuration}ms)`, {
           agentId,
           requestedPrice: request.price,
           currentMidpoint,
@@ -145,8 +159,8 @@ class CLOBClient {
         });
       } catch (slippageError) {
         const error = slippageError as Error;
-        if (error.message && error.message.includes('Order rejected: price')) {
-          throw error; // Re-throw slippage rejections
+        if (error.message && error.message.includes('Order rejected')) {
+          throw error; // Re-throw slippage/staleness rejections
         }
         // If we can't get current price, reject the order — safety fails closed
         logger.error('Cannot verify slippage protection — rejecting order for safety', {

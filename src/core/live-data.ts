@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { Market } from '../utils/types';
 import { gammaClient } from './gamma';
 import { clobClient } from './clob';
+import { safeParseFloat } from '../utils/sanitize';
 
 /**
  * Live Data Service — real-time market data from Gamma API + CLOB WebSocket.
@@ -136,8 +137,8 @@ class LiveDataService extends EventEmitter {
 
     try {
       const raw = await clobClient.getOrderbook(tokenId);
-      const bids = raw.bids.map(l => ({ price: parseFloat(l.price), size: parseFloat(l.size) }));
-      const asks = raw.asks.map(l => ({ price: parseFloat(l.price), size: parseFloat(l.size) }));
+      const bids = raw.bids.map(l => ({ price: safeParseFloat(l.price, 0), size: safeParseFloat(l.size, 0) }));
+      const asks = raw.asks.map(l => ({ price: safeParseFloat(l.price, 1), size: safeParseFloat(l.size, 0) }));
       const bestBid = bids[0]?.price ?? 0;
       const bestAsk = asks[0]?.price ?? 1;
 
@@ -342,7 +343,8 @@ class LiveDataService extends EventEmitter {
 
       // Update orderbook cache if we have price data
       if (data.price !== undefined) {
-        const prices = [parseFloat(data.price), 1 - parseFloat(data.price)];
+        const price = safeParseFloat(data.price, 0.5);
+        const prices = [price, 1 - price];
         this.emit('price_tick', {
           type: 'price_tick',
           marketId: tokenId,
@@ -355,10 +357,11 @@ class LiveDataService extends EventEmitter {
       for (const [id, entry] of this.marketCache) {
         if (entry.data.conditionId === tokenId || entry.data.questionId === tokenId) {
           if (data.price !== undefined) {
-            entry.data.outcomePrices = [parseFloat(data.price), 1 - parseFloat(data.price)];
+            const price = safeParseFloat(data.price, 0.5);
+            entry.data.outcomePrices = [price, 1 - price];
             entry.data.lastUpdate = Date.now();
             entry.data.priceHistory.push({
-              price: parseFloat(data.price),
+              price,
               timestamp: Date.now(),
             });
             if (entry.data.priceHistory.length > this.MAX_PRICE_HISTORY) {
@@ -379,7 +382,7 @@ class LiveDataService extends EventEmitter {
         this.emit('price_tick', {
           type: 'price_tick',
           marketId: tokenId,
-          prices: [parseFloat(data.price)],
+          prices: [safeParseFloat(data.price, 0.5)],
           timestamp: Date.now(),
         });
       }

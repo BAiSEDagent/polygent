@@ -12,6 +12,7 @@ import { agentStore } from '../models/agent';
 import { tradeStore } from '../models/trade';
 import { fullSetArbObserver } from '../services/fullset-observer';
 import { authenticateAgent, requireAdmin } from '../utils/auth';
+import { safeParseInt } from '../utils/sanitize';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.get('/runners', authenticateAgent, (_req: Request, res: Response) => {
 
 /** GET /api/runners/:id/trades — Paper trade history for an agent (requires auth) */
 router.get('/runners/:id/trades', authenticateAgent, (req: Request, res: Response) => {
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const limit = Math.min(safeParseInt(req.query.limit as string, 50), 200);
   const trades = paperTrader.getAgentTrades(req.params.id, limit);
   res.json({ trades, total: trades.length });
 });
@@ -47,7 +48,7 @@ router.get('/leaderboard', (_req: Request, res: Response) => {
 
 /** GET /api/activity — Recent agent activity feed (requires auth) */
 router.get('/activity', (req: Request, res: Response) => {
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const limit = Math.min(safeParseInt(req.query.limit as string, 50), 200);
   const activity = agentRunner.getActivity(limit);
   res.json({ activity, total: activity.length });
 });
@@ -106,14 +107,14 @@ router.get('/fullset/report', (_req: Request, res: Response) => {
 /** GET /api/fullset/snapshots?universe=BTC_5M&limit=100 */
 router.get('/fullset/snapshots', (req: Request, res: Response) => {
   const universe = req.query.universe as string | undefined;
-  const limit = parseInt(req.query.limit as string ?? '100', 10);
+  const limit = safeParseInt(req.query.limit as string, 100);
   res.json({ snapshots: fullSetArbObserver.getRecentSnapshots(universe, limit) });
 });
 
 /** GET /api/fullset/opportunities?universe=BTC_5M&limit=50 */
 router.get('/fullset/opportunities', (req: Request, res: Response) => {
   const universe = req.query.universe as string | undefined;
-  const limit = parseInt(req.query.limit as string ?? '50', 10);
+  const limit = safeParseInt(req.query.limit as string, 50);
   res.json({ opportunities: fullSetArbObserver.getCompletedOpps(universe, limit) });
 });
 

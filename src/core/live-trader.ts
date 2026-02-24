@@ -41,6 +41,7 @@ export class LiveTrader {
   private client: ClobClient;
   private config: LiveTraderConfig;
   private totalExposure: number = 0;
+  private pendingExposure: number = 0; // SECURITY: Optimistic locking for concurrent orders
   private orderCount: number = 0;
   private dailyOrderCount: number = 0;
   private lastResetDay: number = new Date().getDate();
@@ -114,12 +115,16 @@ export class LiveTrader {
       return { success: false, error: msg, tokenId, side, price, size };
     }
 
-    // Gate 2: Total exposure
-    if (this.totalExposure + orderValue > this.config.maxTotalExposure) {
-      const msg = `Total exposure would be $${(this.totalExposure + orderValue).toFixed(2)}, exceeds max $${this.config.maxTotalExposure}`;
+    // Gate 2: Total exposure (with optimistic locking to prevent race conditions)
+    const tentativeExposure = this.totalExposure + this.pendingExposure + orderValue;
+    if (tentativeExposure > this.config.maxTotalExposure) {
+      const msg = `Total exposure (including pending) would be $${tentativeExposure.toFixed(2)}, exceeds max $${this.config.maxTotalExposure}`;
       logger.warn(msg);
       return { success: false, error: msg, tokenId, side, price, size };
     }
+    
+    // Lock exposure immediately to prevent concurrent order race
+    this.pendingExposure += orderValue;
 
     // Gate 3: Price sanity — Polymarket requires [0.01, 0.99]
     if (price < 0.01 || price > 0.99) {
@@ -189,17 +194,22 @@ export class LiveTrader {
       if ((result as any)?.error) {
         const errMsg = (result as any).error;
         logger.error(`❌ Order failed (API error): ${errMsg}`);
+        // Release pending exposure lock
+        this.pendingExposure -= orderValue;
         return { success: false, error: errMsg, tokenId, side, price, size };
       }
 
       const orderId = result?.orderID || result?.id;
       if (!orderId) {
         logger.error(`❌ Order failed: No orderID in response`);
+        // Release pending exposure lock
+        this.pendingExposure -= orderValue;
         return { success: false, error: 'No orderID returned', tokenId, side, price, size };
       }
 
       // Only update tracking on confirmed success
       this.totalExposure += orderValue;
+      this.pendingExposure -= orderValue; // Release lock (order confirmed)
       this.orderCount++;
       this.dailyOrderCount++;
 
@@ -215,7 +225,10 @@ export class LiveTrader {
         size,
       };
     } catch (err: any) {
-      // DO NOT update exposure on failure
+      // Release pending exposure lock on exception
+      this.pendingExposure -= orderValue;
+      
+      // DO NOT update totalExposure on failure
       const errMsg = err?.message || 'Unknown error';
       // Sanitize — never log credentials
       const safeMsg = errMsg.replace(/0x[a-fA-F0-9]{64}/g, '0x***').replace(/Bearer .+/g, 'Bearer ***');
