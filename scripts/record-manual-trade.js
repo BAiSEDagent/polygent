@@ -78,15 +78,21 @@ try {
     const builderFee = takerFee * builderShare;
 
     const insertFee = db.prepare(`
-      INSERT INTO builder_fees (trade_id, fee_usd, timestamp_ms, source)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO builder_fees (id, trade_id, market_id, market_question, notional_usd, price, taker_fee_usd, builder_fee_usd, builder_fee_share, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertFee.run(
+      `fee_${tradeData.id}`,
       tradeData.id,
+      tradeData.market_id,
+      'Trump Gold Cards 10k-25k (manual test)',
+      notional,
+      tradeData.price,
+      takerFee,
       builderFee,
-      tradeData.timestamp * 1000,
-      'manual_backfill'
+      builderShare,
+      tradeData.timestamp
     );
 
     console.log('✅ Builder fee recorded');
