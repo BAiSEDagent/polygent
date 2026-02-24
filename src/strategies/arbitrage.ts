@@ -135,8 +135,7 @@ export class ArbitrageStrategy extends BaseStrategy {
     logger.info(`💰 Spread arb: "${market.question.slice(0, 50)}" YES+NO=${total.toFixed(4)} spread=${(spread * 100).toFixed(2)}%`);
     
     // SECURITY WARNING: Multi-leg arb without FOK creates legging risk in live mode
-    const { config } = await import('../config');
-    if (config.TRADING_MODE === 'live') {
+    if (process.env.TRADING_MODE === 'live') {
       logger.warn(
         `⚠️  Arb signal in LIVE mode without FOK support! Risk: partial fill creates directional exposure. ` +
         `Implement Fill-or-Kill before executing multi-leg strategies.`
