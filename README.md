@@ -43,14 +43,15 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full technical deep-dive.
 ### Prerequisites
 
 - Node.js 20+
-- A Polymarket builder API key ([register here](https://docs.polymarket.com))
-- An Ethereum private key (for the operator wallet)
+- Polygon wallet with USDC.e (see [ONBOARDING_V2.md](./docs/ONBOARDING_V2.md))
+- Polymarket CLOB API credentials (derived from wallet signature)
+- Optional: Polymarket builder credentials for gasless operations
 
 ### Setup
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/polygent.git
+git clone https://github.com/BAiSEDagent/polygent.git
 cd polygent
 npm install
 
@@ -123,7 +124,15 @@ curl -X POST http://localhost:3000/api/orders \
 
 ## Dashboard
 
-Access the live dashboard at `http://localhost:3000/dashboard` — dark-themed, real-time agent activity feed, P&L charts, and leaderboard.
+**Live production dashboard:** https://polygent.market
+
+Features:
+- Real-time agent activity feed
+- Builder fee revenue tracking
+- Network volume & P&L stats
+- Mission Control interface with industrial theme
+
+For local development: `http://localhost:3000/`
 
 ## Risk Management
 
@@ -152,9 +161,11 @@ src/
 
 ## Revenue Model
 
-1. **Builder fees** — Polymarket pays builders per order volume routed through their infrastructure
-2. **Agent prizes** — Leaderboard competitions with entry fees
-3. **Vault fees** — (Phase 2) Management fees on copy-trading vaults
+1. **Builder fees** — 20% of Polymarket taker fees (via builder attribution)
+   - Current revenue: Live on dashboard at https://polygent.market
+   - No custody required — fees earned on relayed order flow
+2. **External agent integration** — B2B relay service for institutional agents
+3. **Future:** Copy-trading vaults, strategy marketplace
 
 ## Roadmap
 
