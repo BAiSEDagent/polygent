@@ -48,14 +48,25 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin: string | undefined, callback) => {
-    // Allow requests with no origin (curl, server-to-server) ONLY in dev
-    if (!origin) {
-      return callback(null, config.NODE_ENV === 'development');
+    // Reject null origin explicitly (security: prevents Origin: null bypass)
+    if (origin === 'null') {
+      return callback(new Error('Null origin not allowed'));
     }
+    
+    // Allow requests with no origin (curl, server-to-server) ONLY in dev
+    // In production, all requests must include valid Origin header
+    if (!origin) {
+      if (config.NODE_ENV === 'development') {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Missing origin header in production'));
+      }
+    }
+    
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true,
@@ -90,8 +101,18 @@ app.use((req, _res, next) => {
 app.use('/api', apiRoutes);
 
 // /sign at root for SDK compatibility (BuilderConfig remote URL = "https://polygent.market/sign")
+// SECURITY: Rate limit signing endpoint to prevent cryptographic DoS
 import builderSignRouter from './api/builder-sign';
-app.use('/sign', builderSignRouter);
+app.use('/sign', 
+  rateLimit({
+    windowMs: 60_000, // 1 minute
+    max: 60,          // 1 signature/sec average (allows bursts)
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Signing rate limit exceeded (60/min)' },
+  }),
+  builderSignRouter
+);
 
 // Health check
 app.get('/health', (_req, res) => {

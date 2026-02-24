@@ -66,7 +66,7 @@ export class ArbitrageStrategy extends BaseStrategy {
 
   // Duplicate listing text gate
   private readonly SIMILARITY_THRESHOLD    = 0.92;
-  private readonly NUMBER_TOLERANCE        = 0.05;
+  private readonly NUMBER_TOLERANCE        = 0.001; // SECURITY: 0.1% for price thresholds (was 5%)
 
   private seenOpportunities = new Set<string>();
 
@@ -365,9 +365,13 @@ export class ArbitrageStrategy extends BaseStrategy {
   private numbersMatch(a: number[], b: number[]): boolean {
     if (a.length === 0 && b.length === 0) return true;
     if (a.length !== b.length) return false;
+    
+    // SECURITY: Use tightened 0.1% tolerance (was 5%)
+    // Context note: both price thresholds ($3000 vs $3015) and small decimals
+    // now require 0.1% match to avoid false positive arb signals
     return a.every((n, i) => {
       const other = b[i];
-      const max   = Math.max(n, other);
+      const max   = Math.max(Math.abs(n), Math.abs(other));
       return max === 0 || Math.abs(n - other) / max <= this.NUMBER_TOLERANCE;
     });
   }
