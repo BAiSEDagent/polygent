@@ -132,7 +132,7 @@ Features:
 - Network volume & P&L stats
 - Mission Control interface with industrial theme
 
-For local development: `http://localhost:3000/`
+For local development: `http://localhost:3000` (same UI, local data)
 
 ## Risk Management
 
