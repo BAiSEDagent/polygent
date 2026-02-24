@@ -83,8 +83,8 @@ export class LiveTrader {
       cfg.chainId,
       signer,
       creds,
-      0,    // EOA signature type (direct wallet signing)
-      undefined, // No funder — signer is maker
+      0,    // SignatureType.EOA - Force EOA mode
+      signer.address, // CRITICAL: Explicit funder = EOA wallet address
       undefined,
       false,
       builderConfig
