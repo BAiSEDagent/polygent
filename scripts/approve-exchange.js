@@ -23,8 +23,8 @@ const ERC1155_ABI = [
 ];
 
 async function approveExchange() {
-  const pk = process.env.PK;
-  if (!pk) throw new Error('PK env var required');
+  const pk = process.env.PK || process.env.PRIVATE_KEY;
+  if (!pk) throw new Error('PK or PRIVATE_KEY env var required');
 
   const provider = new ethers.JsonRpcProvider(POLYGON_RPC);
   const wallet = new ethers.Wallet(pk, provider);
@@ -37,6 +37,23 @@ async function approveExchange() {
   console.log('💰 USDC.e balance:', ethers.formatUnits(balance, 6));
   console.log('');
 
+  // Check and approve USDC.e for Exchange directly (BUY orders)
+  console.log('📊 Checking USDC.e → Exchange approval...');
+  const exchangeAllowance = await usdc.allowance(wallet.address, CTF_EXCHANGE);
+  console.log('   Current:', ethers.formatUnits(exchangeAllowance, 6));
+
+  if (exchangeAllowance === 0n) {
+    console.log('📝 Approving Exchange to spend USDC.e...');
+    const tx1 = await usdc.approve(CTF_EXCHANGE, ethers.MaxUint256);
+    console.log('⏳ TX:', tx1.hash);
+    await tx1.wait();
+    console.log('✅ Exchange approved!');
+    console.log('');
+  } else {
+    console.log('✅ Exchange already approved');
+    console.log('');
+  }
+
   // Check and approve USDC.e for CTF (splits collateral into outcome tokens)
   console.log('📊 Checking USDC.e → CTF approval...');
   const ctfAllowance = await usdc.allowance(wallet.address, CTF);
@@ -44,15 +61,15 @@ async function approveExchange() {
 
   if (ctfAllowance === 0n) {
     console.log('📝 Approving CTF to spend USDC.e...');
-    const tx1 = await usdc.approve(CTF, ethers.MaxUint256);
-    console.log('⏳ TX:', tx1.hash);
-    await tx1.wait();
+    const tx2 = await usdc.approve(CTF, ethers.MaxUint256);
+    console.log('⏳ TX:', tx2.hash);
+    await tx2.wait();
     console.log('✅ CTF approved!');
+    console.log('');
   } else {
     console.log('✅ CTF already approved');
+    console.log('');
   }
-
-  console.log('');
 
   // Check and approve CTF for Exchange (trades outcome tokens)
   console.log('📊 Checking CTF → Exchange approval...');
@@ -62,15 +79,16 @@ async function approveExchange() {
 
   if (!exchangeApproved) {
     console.log('📝 Approving Exchange to trade outcome tokens...');
-    const tx2 = await ctf.setApprovalForAll(CTF_EXCHANGE, true);
-    console.log('⏳ TX:', tx2.hash);
-    await tx2.wait();
+    const tx3 = await ctf.setApprovalForAll(CTF_EXCHANGE, true);
+    console.log('⏳ TX:', tx3.hash);
+    await tx3.wait();
     console.log('✅ Exchange approved!');
+    console.log('');
   } else {
     console.log('✅ Exchange already approved');
+    console.log('');
   }
 
-  console.log('');
   console.log('✅ All approvals set! You can now trade on Polymarket.');
 }
 
