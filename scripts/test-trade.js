@@ -56,7 +56,7 @@ async function placeBuyOrder() {
     side: 'BUY',
     feeRateBps: '0',
     nonce: Date.now(),
-    expiration: Math.floor(Date.now() / 1000) + 86400, // 24h
+    expiration: 0, // GTC order (Good-Til-Canceled)
   });
 
   console.log('📤 Submitting order to matching engine...');
