@@ -34,17 +34,17 @@ async function approveExchange() {
   console.log('');
   
   const balance = await usdc.balanceOf(wallet.address);
-  console.log('💰 USDC.e balance:', ethers.formatUnits(balance, 6));
+  console.log('💰 USDC.e balance:', ethers.utils.formatUnits(balance, 6));
   console.log('');
 
   // Check and approve USDC.e for Exchange directly (BUY orders)
   console.log('📊 Checking USDC.e → Exchange approval...');
   const exchangeAllowance = await usdc.allowance(wallet.address, CTF_EXCHANGE);
-  console.log('   Current:', ethers.formatUnits(exchangeAllowance, 6));
+  console.log('   Current:', ethers.utils.formatUnits(exchangeAllowance, 6));
 
-  if (exchangeAllowance === 0n) {
+  if (exchangeAllowance.isZero()) {
     console.log('📝 Approving Exchange to spend USDC.e...');
-    const tx1 = await usdc.approve(CTF_EXCHANGE, ethers.MaxUint256);
+    const tx1 = await usdc.approve(CTF_EXCHANGE, ethers.constants.MaxUint256);
     console.log('⏳ TX:', tx1.hash);
     await tx1.wait();
     console.log('✅ Exchange approved!');
@@ -57,11 +57,11 @@ async function approveExchange() {
   // Check and approve USDC.e for CTF (splits collateral into outcome tokens)
   console.log('📊 Checking USDC.e → CTF approval...');
   const ctfAllowance = await usdc.allowance(wallet.address, CTF);
-  console.log('   Current:', ethers.formatUnits(ctfAllowance, 6));
+  console.log('   Current:', ethers.utils.formatUnits(ctfAllowance, 6));
 
-  if (ctfAllowance === 0n) {
+  if (ctfAllowance.isZero()) {
     console.log('📝 Approving CTF to spend USDC.e...');
-    const tx2 = await usdc.approve(CTF, ethers.MaxUint256);
+    const tx2 = await usdc.approve(CTF, ethers.constants.MaxUint256);
     console.log('⏳ TX:', tx2.hash);
     await tx2.wait();
     console.log('✅ CTF approved!');
