@@ -55,7 +55,7 @@ async function placeBuyOrder() {
     size: parseFloat(size),
     side: 'BUY',
     feeRateBps: '0',
-    nonce: Date.now(),
+    // nonce omitted — let SDK generate it
     expiration: 0, // GTC order (Good-Til-Canceled)
   });
 
