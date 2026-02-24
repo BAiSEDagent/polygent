@@ -64,26 +64,31 @@ async function redeemPosition() {
   );
 
   console.log('🔄 Redeeming position (merge to USDC.e)...');
-  console.log('   This calls CTF.redeemPositions() via gasless relayer');
+  console.log('   Calling CTF.redeemPositions() directly');
   console.log('');
 
   try {
-    // Redeem positions (merge outcome tokens → USDC.e)
-    const response = await relayClient.redeemPositions({
-      tokenIds: [TOKEN_ID],
-      amounts: [balance.toString()]
-    });
-
-    console.log('⏳ Waiting for transaction...');
-    const result = await response.wait();
-
-    if (!result) {
-      throw new Error('Redeem returned no result');
-    }
-
-    console.log('✅ Position redeemed!');
-    console.log('   TX:', result.transactionHash);
+    // Encode CTF.redeemPositions() call
+    const CTF_ABI = [
+      'function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint256[] calldata indexSets) external'
+    ];
+    
+    const ctfContract = new ethers.Contract(CTF, CTF_ABI, wallet);
+    
+    // For single-outcome redemption, we need the market's conditionId and parentCollectionId
+    // These are derived from the market parameters, but for emergency exit we can use the
+    // Polymarket UI or wait for the relayer support to be added
+    
+    console.log('⚠️  Direct CTF redemption requires market-specific parameters');
+    console.log('    (conditionId, parentCollectionId, indexSets)');
     console.log('');
+    console.log('Alternative exit paths:');
+    console.log('1. Use Polymarket UI: polymarket.com/profile');
+    console.log('2. Wait for CLOB balance sync (may take hours)');
+    console.log('3. Keep position until liquidity improves');
+    console.log('');
+    
+    throw new Error('Direct CTF redemption not yet implemented (requires market params)');
 
     // Check USDC.e balance after redemption
     const usdcAfter = await usdc.balanceOf(wallet.address);
