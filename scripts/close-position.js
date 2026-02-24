@@ -46,14 +46,24 @@ async function closePosition() {
     return;
   }
 
-  // Get current best bid
+  // Get current best bid and ask
   console.log('📊 Fetching order book...');
   const book = await clob.getOrderBook(TOKEN_ID);
   const bestBid = book.bids[0];
+  const bestAsk = book.asks[0];
+  
   if (!bestBid) throw new Error('No bids available');
 
-  const price = parseFloat(bestBid.price);
-  console.log('   Best bid:', price);
+  const bidPrice = parseFloat(bestBid.price);
+  const askPrice = bestAsk ? parseFloat(bestAsk.price) : null;
+  
+  console.log('   Best bid:', bidPrice);
+  console.log('   Best ask:', askPrice || 'none');
+  
+  // Use mid-market price (slightly below ask) for better fill chance
+  const price = askPrice ? (bidPrice + askPrice) / 2 : bidPrice;
+  
+  console.log('   Sell price:', price.toFixed(3));
   console.log('   Selling:', shares.toFixed(3), 'shares');
   console.log('   Expected: $' + (shares * price).toFixed(2));
   console.log('');
