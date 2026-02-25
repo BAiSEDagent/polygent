@@ -8,8 +8,9 @@
 
 ### Security
 - [ ] **Treasury Multisig** — Adam deploys Gnosis Safe for builder fee revenue (30 min, see TREASURY_SETUP.md)
-- [ ] **Signature Verification Audit** — Ensure relay can only submit to Polymarket, never move principal funds
-- [ ] **Rate Limit Review** — Test `/api/agents/register` spam resistance
+- [x] **Signature Verification Audit** — ✅ COMPLETE (see SECURITY_AUDIT.md) — Zero-custody verified
+- [ ] **Rate Limit Stress Test** — Simulate 100 orders/sec, test IP rotation bypass
+- [ ] **Monitoring Setup** — UptimeRobot + Sentry for error tracking
 
 ### Core Functionality  
 - [ ] **Live Intel Feed** — Connect dashboard to `trades` table for real-time activity
@@ -70,6 +71,9 @@
 ## ✅ DONE (Last 7 Days)
 
 ### 2026-02-24
+- [x] **Security Audit** — Comprehensive signature + custody verification (SECURITY_AUDIT.md)
+- [x] **Live Intel Feed** — Dashboard now shows real trades from database (`/api/activity/live`)
+- [x] **Development Kanban** — Full project task tracking (KANBAN.md)
 - [x] Market metadata caching service (solves SELL-side exit)
 - [x] Autonomous CTF redemption script (`redeem-position-v2.js`)
 - [x] RelayerClient integration (`src/core/relayer.ts`)
