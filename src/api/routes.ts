@@ -54,6 +54,51 @@ router.get('/activity', (req: Request, res: Response) => {
   res.json({ activity, total: activity.length });
 });
 
+/** GET /api/activity/live — Live trade feed from database (public, for dashboard) */
+router.get('/activity/live', (req: Request, res: Response) => {
+  const limit = Math.min(safeParseInt(req.query.limit as string, 50), 200);
+  
+  try {
+    // Query recent trades from database
+    const db = require('../core/db').getDb();
+    const trades = db.prepare(`
+      SELECT 
+        t.id,
+        t.agent_id,
+        t.market_id,
+        t.side,
+        t.outcome,
+        t.amount,
+        t.price,
+        t.timestamp,
+        t.source,
+        a.name as agent_name
+      FROM trades t
+      LEFT JOIN agents a ON t.agent_id = a.id
+      ORDER BY t.timestamp DESC
+      LIMIT ?
+    `).all(limit);
+
+    // Transform to activity feed format
+    const activity = trades.map((t: any) => ({
+      type: 'trade',
+      timestamp: t.timestamp * 1000, // Convert to ms
+      agentId: t.agent_id,
+      agentName: t.agent_name || 'Unknown Agent',
+      action: `${t.side} ${t.amount.toFixed(2)} ${t.outcome} @ $${t.price.toFixed(2)}`,
+      marketId: t.market_id,
+      notional: t.amount * t.price,
+      source: t.source,
+      tradeId: t.id
+    }));
+
+    res.json({ activity, total: activity.length });
+  } catch (err) {
+    logger.error('/api/activity/live error', { error: err });
+    res.status(500).json({ error: 'Failed to fetch live activity' });
+  }
+});
+
 /** GET /api/stats — System-wide stats */
 router.get('/stats', (_req: Request, res: Response) => {
   const liveStats = liveDataService.getStats();

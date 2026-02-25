@@ -22,7 +22,7 @@ export function Dashboard() {
 
   const healthFetch = useCallback(() => api.getHealth(), []);
   const lbFetch     = useCallback(() => api.getLeaderboard(), []);
-  const actFetch    = useCallback(() => api.getActivity(100), []);
+  const actFetch    = useCallback(() => api.getLiveActivity(100), []);  // Changed to live feed
 
   const { data: health  } = usePolling(healthFetch, 5000);
   const { data: lbData  } = usePolling(lbFetch, 4000);

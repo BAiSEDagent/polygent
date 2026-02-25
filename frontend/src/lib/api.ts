@@ -14,6 +14,7 @@ const health = () => {
 export const api = {
   getLeaderboard: () => get('/leaderboard'),
   getActivity: (limit = 100) => get(`/activity?limit=${limit}`),
+  getLiveActivity: (limit = 100) => get(`/activity/live?limit=${limit}`),
   getMarkets: (limit = 20) => get(`/markets?limit=${limit}`),
   getPortfolio: () => get('/portfolio'),
   getHealth: health,
