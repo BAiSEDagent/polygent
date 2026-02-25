@@ -22,7 +22,7 @@ const registrationRateLimit = rateLimit({
 
 // External registration rate limit: 3 per hour per IP (more conservative — public endpoint)
 const externalRegistrationRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000,
+  windowMs: 60 * 60 * 1000, // 1 hour = 3,600,000ms
   max: 3,
   message: { error: 'Registration rate limit exceeded. Try again in an hour.' },
   standardHeaders: true,
