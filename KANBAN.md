@@ -7,7 +7,7 @@
 ## 🔴 CRITICAL (Do Immediately)
 
 ### Security
-- [ ] **Treasury Multisig** — Deploy Gnosis Safe for builder fee revenue (see TREASURY_SETUP.md)
+- [ ] **Treasury Multisig** — Adam deploys Gnosis Safe for builder fee revenue (30 min, see TREASURY_SETUP.md)
 - [ ] **Signature Verification Audit** — Ensure relay can only submit to Polymarket, never move principal funds
 - [ ] **Rate Limit Review** — Test `/api/agents/register` spam resistance
 
