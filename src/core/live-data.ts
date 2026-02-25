@@ -216,8 +216,12 @@ class LiveDataService extends EventEmitter {
         ascending: false,
       });
 
+      // Only keep execution-valid markets in the primary universe.
+      // Prevents UI/API from advertising markets we cannot trade.
+      const tradable = markets.filter(m => m.active && !m.closed && !!m.conditionId && m.tokenIds.length > 0);
+
       const now = Date.now();
-      const liveMarkets: LiveMarket[] = markets.map(m => {
+      const liveMarkets: LiveMarket[] = tradable.map(m => {
         const existing = this.marketCache.get(m.id)?.data;
         const yesPrice = m.outcomePrices[0] ?? 0.5;
 
@@ -253,7 +257,7 @@ class LiveDataService extends EventEmitter {
       this.topMarkets = liveMarkets;
       this.emit('markets_refreshed', { type: 'markets_refreshed', count: liveMarkets.length });
 
-      logger.debug(`Markets refreshed: ${liveMarkets.length} active markets`);
+      logger.debug(`Markets refreshed: ${liveMarkets.length} tradable markets (from ${markets.length} active)`);
     } catch (error) {
       logger.warn('Failed to refresh markets', { error: (error as Error).message });
     }

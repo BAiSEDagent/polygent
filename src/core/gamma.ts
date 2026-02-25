@@ -82,7 +82,7 @@ class GammaClient {
       description: raw.description ?? '',
       outcomes: this.parseStringArray(raw.outcomes) ?? ['Yes', 'No'],
       outcomePrices: this.parsePrices(raw.outcomePrices ?? raw.outcome_prices),
-      tokenIds: this.parseStringArray(raw.clobTokenIds) ?? [],
+      tokenIds: this.parseTokenIds(raw),
       negRisk: raw.negRisk === true || raw.negRisk === 'true',
       volume: Number(raw.volume ?? raw.volumeNum ?? 0),
       liquidity: Number(raw.liquidity ?? raw.liquidityNum ?? 0),
@@ -156,6 +156,23 @@ class GammaClient {
   /** Get top markets by volume */
   async getTopMarkets(limit = 10): Promise<Market[]> {
     return this.listMarkets({ limit, order: 'volume', ascending: false });
+  }
+
+  /** Parse token ids from multiple Gamma formats */
+  private parseTokenIds(raw: any): string[] {
+    // Preferred: clobTokenIds (JSON string or array)
+    const fromClob = this.parseStringArray(raw?.clobTokenIds ?? raw?.clob_token_ids);
+    if (fromClob && fromClob.length > 0) return fromClob;
+
+    // Fallback: embedded tokens array
+    if (Array.isArray(raw?.tokens)) {
+      const fromTokens = raw.tokens
+        .map((t: any) => t?.token_id ?? t?.tokenId)
+        .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0);
+      if (fromTokens.length > 0) return fromTokens;
+    }
+
+    return [];
   }
 
   /** Parse a string-or-array field (Gamma returns JSON strings for arrays) */
