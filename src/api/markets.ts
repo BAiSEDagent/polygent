@@ -12,12 +12,14 @@ router.get('/', async (req: Request, res: Response) => {
 
     // Prefer live data service (cached + enriched)
     const liveMarkets = liveDataService.getTopMarkets(Math.min(limit, 100));
+    const tradableLive = liveMarkets.filter(m => !!m.conditionId && m.tokenIds.length > 0);
 
-    if (liveMarkets.length > 0) {
+    if (tradableLive.length > 0) {
       res.json({
-        markets: liveMarkets.map(m => ({
+        markets: tradableLive.map(m => ({
           id: m.id,
           conditionId: m.conditionId,
+          tokenIds: m.tokenIds,
           question: m.question,
           description: m.description,
           outcomes: m.outcomes,
@@ -30,7 +32,7 @@ router.get('/', async (req: Request, res: Response) => {
           change24h: m.change24h,
           lastUpdate: m.lastUpdate,
         })),
-        total: liveMarkets.length,
+        total: tradableLive.length,
         source: 'live',
       });
       return;
@@ -42,14 +44,19 @@ router.get('/', async (req: Request, res: Response) => {
     const tag = req.query.tag as string | undefined;
 
     const markets = await gammaClient.listMarkets({
-      limit: Math.min(limit, 100),
+      // Pull a wider slice, then keep only execution-valid markets
+      limit: 300,
       offset,
       order,
       ascending: false,
       tag,
     });
 
-    res.json({ markets, total: markets.length, offset, limit, source: 'gamma' });
+    const tradable = markets
+      .filter(m => !!m.conditionId && m.tokenIds.length > 0)
+      .slice(0, Math.min(limit, 100));
+
+    res.json({ markets: tradable, total: tradable.length, offset, limit, source: 'gamma' });
   } catch (error) {
     logger.error('Failed to fetch markets', { error: (error as Error).message });
     res.status(502).json({ error: 'Failed to fetch markets from Gamma API' });

@@ -164,9 +164,21 @@ class GammaClient {
     const fromClob = this.parseStringArray(raw?.clobTokenIds ?? raw?.clob_token_ids);
     if (fromClob && fromClob.length > 0) return fromClob;
 
-    // Fallback: embedded tokens array
+    // Fallback: embedded tokens array (array or JSON string)
+    let tokens: any[] | null = null;
     if (Array.isArray(raw?.tokens)) {
-      const fromTokens = raw.tokens
+      tokens = raw.tokens;
+    } else if (typeof raw?.tokens === 'string') {
+      try {
+        const parsed = JSON.parse(raw.tokens);
+        if (Array.isArray(parsed)) tokens = parsed;
+      } catch {
+        tokens = null;
+      }
+    }
+
+    if (tokens) {
+      const fromTokens = tokens
         .map((t: any) => t?.token_id ?? t?.tokenId)
         .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0);
       if (fromTokens.length > 0) return fromTokens;
