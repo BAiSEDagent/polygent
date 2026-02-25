@@ -158,7 +158,11 @@ async function bootstrap(): Promise<void> {
   logger.info('🧠 Polygent — AI Agent Trading Platform for Polymarket');
   logger.info('─'.repeat(60));
 
-  // 0. Backfill builder fees from historical trades (run once on first deployment)
+  // 0. Initialize market metadata cache
+  const { initMarketMetadataTable } = await import('./services/market-metadata');
+  initMarketMetadataTable();
+
+  // 0.5. Backfill builder fees from historical trades (run once on first deployment)
   const { backfillBuilderFeesFromTrades } = await import('./utils/builder-fees');
   backfillBuilderFeesFromTrades();
 

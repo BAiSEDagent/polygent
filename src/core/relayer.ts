@@ -157,41 +157,68 @@ export async function setTokenApprovals(safeAddress: string): Promise<void> {
 /**
  * Redeem CTF positions (merge outcome tokens back to USDC.e)
  * Used for closing positions when CLOB SELL orders fail
+ * 
+ * @param tokenId - Outcome token ID
+ * @param amount - Amount to redeem (in wei, e.g., "1000000" for 1 share)
+ * @returns Transaction hash
  */
-export async function redeemPositions(
-  tokenIds: string[],
-  amounts: string[]
+export async function redeemPosition(
+  tokenId: string,
+  amount: string
 ): Promise<string> {
-  const relayer = getRelayer();
-
-  if (tokenIds.length !== amounts.length) {
-    throw new Error('tokenIds and amounts arrays must have same length');
-  }
+  const { getMarketMetadata } = await import('../services/market-metadata');
+  const { ethers } = require('ethers');
+  const { config } = await import('../config');
 
   try {
-    logger.info('🔄 Redeeming CTF positions (merge to USDC.e)...', {
-      positions: tokenIds.length
-    });
+    logger.info('🔄 Fetching market metadata for redemption...', { tokenId });
 
-    const response = await relayer.redeemPositions({
-      tokenIds,
-      amounts
-    });
-
-    const result = await response.wait();
-
-    if (!result) {
-      throw new Error('Redeem returned no result');
+    // Get market metadata from cache or API
+    const metadata = await getMarketMetadata(tokenId);
+    if (!metadata) {
+      throw new Error(`Market metadata not found for token ${tokenId}`);
     }
 
-    logger.info('✅ Positions redeemed', {
-      txHash: result.transactionHash,
-      positions: tokenIds.length
+    logger.info('📊 Market metadata retrieved', {
+      conditionId: metadata.conditionId,
+      indexSet: metadata.indexSet,
+      question: metadata.question
     });
 
-    return result.transactionHash;
+    // Get wallet and CTF contract
+    const provider = new ethers.providers.JsonRpcProvider(config.RPC_URL);
+    const wallet = new ethers.Wallet(config.OPERATOR_PRIVATE_KEY || '', provider);
+
+    const CTF_ADDRESS = '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045';
+    const USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+
+    const CTF_ABI = [
+      'function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint256[] calldata indexSets) external'
+    ];
+
+    const ctf = new ethers.Contract(CTF_ADDRESS, CTF_ABI, wallet);
+
+    // Call CTF.redeemPositions
+    logger.info('📤 Submitting redemption transaction...');
+    const tx = await ctf.redeemPositions(
+      USDC_E,
+      metadata.parentCollectionId,
+      metadata.conditionId,
+      [metadata.indexSet]
+    );
+
+    logger.info('⏳ Waiting for confirmation...', { txHash: tx.hash });
+    const receipt = await tx.wait();
+
+    logger.info('✅ Position redeemed', {
+      txHash: receipt.transactionHash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString()
+    });
+
+    return receipt.transactionHash;
   } catch (err) {
-    logger.error('Position redemption failed', { tokenIds, amounts, error: err });
+    logger.error('Position redemption failed', { tokenId, amount, error: err });
     throw new Error(`Position redemption failed: ${err instanceof Error ? err.message : 'unknown error'}`);
   }
 }
