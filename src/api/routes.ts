@@ -14,6 +14,7 @@ import { fullSetArbObserver } from '../services/fullset-observer';
 import { authenticateAgent, requireAdmin } from '../utils/auth';
 import { safeParseInt } from '../utils/sanitize';
 import { getTotalBuilderFees, getDailyBuilderFees, getBuilderFeeShare } from '../utils/builder-fees';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
