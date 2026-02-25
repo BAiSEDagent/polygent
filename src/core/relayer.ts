@@ -121,37 +121,15 @@ export async function deploySafe(): Promise<string> {
 
 /**
  * Set token approvals via relayer (gasless)
+ * 
+ * NOTE: RelayerClient.approve() API may vary by version.
+ * For production, use the wagmi-safe-builder-example pattern:
+ * https://github.com/Polymarket/wagmi-safe-builder-example/blob/main/hooks/useTokenApprovals.ts
  */
 export async function setTokenApprovals(safeAddress: string): Promise<void> {
-  const relayer = getRelayer();
-  const { ApprovalType } = require('@polymarket/builder-relayer-client');
-
-  const USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
-  const CTF = '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045';
-  const EXCHANGE = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
-
-  try {
-    logger.info('📝 Setting USDC.e approval (gasless)...');
-    const usdcApproval = await relayer.approve({
-      tokenAddress: USDC_E,
-      spender: CTF,
-      amount: '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // MaxUint256
-    });
-    await usdcApproval.wait();
-
-    logger.info('📝 Setting CTF approval (gasless)...');
-    const ctfApproval = await relayer.approve({
-      tokenAddress: CTF,
-      spender: EXCHANGE,
-      approvalType: ApprovalType.SetApprovalForAll,
-    });
-    await ctfApproval.wait();
-
-    logger.info('✅ Token approvals set', { safeAddress });
-  } catch (err) {
-    logger.error('Token approval failed', { safeAddress, error: err });
-    throw new Error(`Token approval failed: ${err instanceof Error ? err.message : 'unknown error'}`);
-  }
+  logger.warn('setTokenApprovals() not fully implemented — use scripts/approve-exchange.js for now');
+  // TODO: Implement using RelayerClient API once version compatibility confirmed
+  throw new Error('Not implemented — use manual approval script');
 }
 
 /**
