@@ -56,7 +56,7 @@ async function fetchMarketMetadata(tokenId: string): Promise<MarketMetadata | nu
       throw new Error(`Gamma API error: ${response.status}`);
     }
 
-    const markets = await response.json();
+    const markets = await response.json() as any[];
 
     // Find market containing this token
     for (const market of markets) {

@@ -71,6 +71,12 @@ export const config = {
   // Polymarket proxy/funder wallet (Gnosis Safe address)
   FUNDER_ADDRESS: env('FUNDER_ADDRESS', ''),
 
+  // Polygon RPC
+  RPC_URL: env('RPC_URL', 'https://polygon-pokt.nodies.app'),
+
+  // Remote signing (for Safe/Relayer builder auth)
+  REMOTE_SIGNING_URL: env('REMOTE_SIGNING_URL', ''),
+
   // Risk defaults
   DEFAULT_MAX_POSITION_PCT: envNum('DEFAULT_MAX_POSITION_PCT', 0.20),
   DEFAULT_MAX_DRAWDOWN_PCT: envNum('DEFAULT_MAX_DRAWDOWN_PCT', 0.30),
