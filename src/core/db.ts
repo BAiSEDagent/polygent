@@ -75,6 +75,7 @@ function migrate(db: Database.Database): void {
       equity_json TEXT NOT NULL DEFAULT '{}',
       last_activity INTEGER,
       registered_via_api INTEGER NOT NULL DEFAULT 0,
+      auto_redeem INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -184,6 +185,14 @@ function migrate(db: Database.Database): void {
   try {
     db.exec(`ALTER TABLE paper_trades ADD COLUMN maker_fee REAL NOT NULL DEFAULT 0`);
     logger.info('Migrated paper_trades: added maker_fee column');
+  } catch {
+    // Column already exists — expected on fresh installs with updated schema
+  }
+
+  // Safe migration: add auto_redeem to existing agents tables
+  try {
+    db.exec(`ALTER TABLE agents ADD COLUMN auto_redeem INTEGER NOT NULL DEFAULT 0`);
+    logger.info('Migrated agents: added auto_redeem column');
   } catch {
     // Column already exists — expected on fresh installs with updated schema
   }

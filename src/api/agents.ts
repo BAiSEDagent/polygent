@@ -267,6 +267,47 @@ router.get('/:id', requireAdmin, (req: Request, res: Response) => {
   });
 });
 
+/** PATCH /api/agents/:id — Update agent settings (admin only) */
+router.patch('/:id', requireAdmin, (req: Request, res: Response) => {
+  const agent = agentStore.get(req.params.id);
+  if (!agent) {
+    res.status(404).json({ error: 'Agent not found' });
+    return;
+  }
+
+  const updates = req.body as { autoRedeem?: boolean; config?: Partial<any> };
+  
+  // Update auto_redeem setting
+  if (typeof updates.autoRedeem === 'boolean') {
+    try {
+      const db = require('../core/db').getDb();
+      db.prepare('UPDATE agents SET auto_redeem = ?, updated_at = ? WHERE id = ?')
+        .run(updates.autoRedeem ? 1 : 0, Date.now(), agent.id);
+      
+      // Update in-memory
+      agent.autoRedeem = updates.autoRedeem;
+      agent.updatedAt = Date.now();
+      
+      logger.info(`Agent ${agent.id} auto-redeem set to ${updates.autoRedeem}`);
+    } catch (err) {
+      logger.error('Failed to update agent auto_redeem', { 
+        agentId: agent.id, 
+        error: (err as Error).message 
+      });
+      res.status(500).json({ error: 'Failed to update agent settings' });
+      return;
+    }
+  }
+
+  res.json({
+    id: agent.id,
+    name: agent.name,
+    autoRedeem: agent.autoRedeem ?? false,
+    status: agent.status,
+    updatedAt: agent.updatedAt,
+  });
+});
+
 /** DELETE /api/agents/:id — Deactivate agent (admin only) */
 router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
   const agent = agentStore.deactivate(req.params.id);

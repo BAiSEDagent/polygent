@@ -14,6 +14,7 @@ export interface Agent {
   equity: AgentEquity;
   lastActivity?: number;
   registeredViaApi?: boolean;
+  autoRedeem?: boolean;
   createdAt: number;
   updatedAt: number;
 }

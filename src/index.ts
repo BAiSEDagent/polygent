@@ -172,6 +172,10 @@ async function bootstrap(): Promise<void> {
   // 2. Start live data service
   await liveDataService.start();
 
+  // 2.1. Start auto-redeemer service
+  const { autoRedeemerService } = await import('./services/auto-redeemer');
+  autoRedeemerService.start();
+
   // 2.5. Initialize live trader if in live mode
   if (config.NODE_ENV !== 'production' || process.env.TRADING_MODE === 'live') {
     if (process.env.TRADING_MODE === 'live' && process.env.PK) {
