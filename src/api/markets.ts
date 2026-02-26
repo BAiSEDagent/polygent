@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { gammaClient } from '../core/gamma';
 import { liveDataService } from '../core/live-data';
 import { logger } from '../utils/logger';
+import { scoreMarkets, filterAgentFriendly } from '../utils/market-scoring';
 
 const router = Router();
 
@@ -90,6 +91,98 @@ router.get('/top', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to fetch top markets', { error: (error as Error).message });
     res.status(502).json({ error: 'Failed to fetch top markets' });
+  }
+});
+
+/** GET /api/markets/soonest — Markets ending soonest */
+router.get('/soonest', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 10;
+    const liquid = req.query.liquid === 'true';
+    const feeEnabled = req.query.feeEnabled !== 'false'; // default true
+
+    const allMarkets = liveDataService.getTopMarkets(200);
+    const now = Date.now();
+    
+    let candidates = allMarkets
+      .filter(m => {
+        const endMs = m.endDate ? new Date(m.endDate).getTime() : NaN;
+        return Number.isFinite(endMs) && endMs > now;
+      })
+      .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+
+    if (liquid) {
+      candidates = candidates.filter(m => m.liquidity >= 1000);
+    }
+
+    const scored = candidates.slice(0, limit).map(m => {
+      const result = scoreMarkets([m])[0];
+      return {
+        id: result.id,
+        conditionId: result.conditionId,
+        tokenIds: result.tokenIds,
+        question: result.question,
+        description: result.description,
+        outcomes: result.outcomes,
+        outcomePrices: result.outcomePrices,
+        volume: result.volume,
+        liquidity: result.liquidity,
+        endDate: result.endDate,
+        active: result.active,
+        category: result.category,
+        agentFriendly: result.agentFriendly,
+        estimatedSpreadBps: result.estimatedSpreadBps,
+        timeToCloseSec: result.timeToCloseSec,
+        score: result.score,
+      };
+    });
+
+    res.json({ markets: scored, total: scored.length, filters: { liquid, feeEnabled } });
+  } catch (error) {
+    logger.error('Failed to fetch soonest markets', { error: (error as Error).message });
+    res.status(502).json({ error: 'Failed to fetch soonest markets' });
+  }
+});
+
+/** GET /api/markets/recommended — Recommended markets for agents */
+router.get('/recommended', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 5;
+    const agentId = req.query.agentId as string | undefined;
+
+    // Get top tradable markets and score them
+    const allMarkets = liveDataService.getTopMarkets(100);
+    const scored = scoreMarkets(allMarkets);
+
+    // For now, return top-scored agent-friendly markets
+    // TODO: personalize based on agentId (strategy, capital, risk tolerance)
+    const recommended = scored
+      .filter(m => m.agentFriendly)
+      .slice(0, limit)
+      .map(m => ({
+        id: m.id,
+        conditionId: m.conditionId,
+        tokenIds: m.tokenIds,
+        question: m.question,
+        description: m.description,
+        outcomes: m.outcomes,
+        outcomePrices: m.outcomePrices,
+        volume: m.volume,
+        liquidity: m.liquidity,
+        endDate: m.endDate,
+        active: m.active,
+        category: m.category,
+        agentFriendly: m.agentFriendly,
+        estimatedSpreadBps: m.estimatedSpreadBps,
+        timeToCloseSec: m.timeToCloseSec,
+        score: m.score,
+        scoringReasons: m.scoringReasons,
+      }));
+
+    res.json({ markets: recommended, total: recommended.length, agentId: agentId || null });
+  } catch (error) {
+    logger.error('Failed to fetch recommended markets', { error: (error as Error).message });
+    res.status(502).json({ error: 'Failed to fetch recommended markets' });
   }
 });
 
