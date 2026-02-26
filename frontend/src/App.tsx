@@ -6,6 +6,7 @@ import Connect from './pages/Connect';
 import { Landing } from './Landing';
 import { SkillManifest } from './Skill';
 import { Dashboard } from './Dashboard';
+import { SovereignDashboard } from './pages/SovereignDashboard';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/skill" element={<SkillManifest />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/:agentId" element={<SovereignDashboard />} />
 
         <Route element={<Layout />}>
           <Route path="/markets" element={<Markets />} />

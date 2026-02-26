@@ -5,6 +5,7 @@ import builderSignRouter from './builder-sign';
 import marketsRouter from './markets';
 import portfolioRouter from './portfolio';
 import copiersRouter from './copiers';
+import dashboardRouter from './dashboard';
 import { liveDataService } from '../core/live-data';
 import { agentRunner } from '../core/agent-runner';
 import { paperTrader } from '../core/paper-trader';
@@ -20,6 +21,7 @@ const router = Router();
 
 router.use('/agents', agentsRouter);
 router.use('/orders', ordersRouter);
+router.use('/dashboard', dashboardRouter);
 
 // Mount at /api/sign — but also need /sign at root for SDK compatibility
 router.use('/sign', builderSignRouter);
