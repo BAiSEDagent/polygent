@@ -8,6 +8,7 @@ import { generateApiKey, hashApiKey, requireAdmin } from '../utils/auth';
 import { logger } from '../utils/logger';
 import { tradeStore } from '../models/trade';
 import { AgentCreateRequest, AgentCreateResponse } from '../utils/types';
+import { checkAgentHealth } from '../core/health-check';
 
 const router = Router();
 
@@ -265,6 +266,33 @@ router.get('/:id', requireAdmin, (req: Request, res: Response) => {
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
   });
+});
+
+/**
+ * GET /api/agents/:id/health — Agent health check (public)
+ *
+ * Returns:
+ * - Wallet balances (USDC.e, POL)
+ * - Approval status (USDC → Exchange, CTF → Exchange)
+ * - Circuit breaker status
+ * - List of blockers preventing trades
+ *
+ * This allows agents to self-diagnose why a trade might fail
+ * (e.g., balance below minimum, missing approvals, circuit breaker)
+ */
+router.get('/:id/health', async (req: Request, res: Response) => {
+  try {
+    const healthCheck = await checkAgentHealth(req.params.id);
+    res.json(healthCheck);
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message.includes('not found')) {
+      res.status(404).json({ error: message });
+    } else {
+      logger.error('Health check failed', { error: message });
+      res.status(500).json({ error: 'Health check failed', details: message });
+    }
+  }
 });
 
 /** PATCH /api/agents/:id — Update agent settings (admin only) */
