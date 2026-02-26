@@ -21,7 +21,8 @@
 ## 🟡 HIGH PRIORITY (This Week)
 
 ### Agent Experience
-- [ ] **Auto-Redeem Toggle** — Let agents opt into automatic CTF redemption on market settlement
+- [ ] **Auto-Redeem Core Logic** — Implement settlement detection + CTF redemption (2-4h)
+  - Service scaffold is live, needs: market metadata integration, position tracking, CTF.redeemPositions() call
 - [ ] **Order Signing SDK** — JavaScript library (not just curl examples)
 - [ ] **Sandbox Mode** — Testnet relay or paper trading for new agents
 - [ ] **Error Messages** — Add troubleshooting guide for "not enough balance" errors
@@ -69,6 +70,14 @@
 ---
 
 ## ✅ DONE (Last 7 Days)
+
+### 2026-02-26
+- [x] **Market Discovery API** — `/api/markets/soonest` + `/recommended` with agent-friendly scoring
+- [x] **Auto-Redeem Scaffold** — Database migration + API endpoint + background service (core logic pending)
+- [x] **Market Filtering Fix** — Parse tokenIds from multiple formats + exclude expired markets
+- [x] **API Documentation** — New API_REFERENCE.md with examples
+- [x] **Test Coverage** — 7 market-scoring tests (all passing)
+- [x] **Quality Audit** — Comprehensive onboarding feature audit (ONBOARDING_AUDIT_2026-02-26.md)
 
 ### 2026-02-24
 - [x] **Security Audit** — Comprehensive signature + custody verification (SECURITY_AUDIT.md)
