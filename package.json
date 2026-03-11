@@ -27,7 +27,8 @@
     "node-fetch": "^3.3.2",
     "uuid": "^9.0.0",
     "winston": "^3.11.0",
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

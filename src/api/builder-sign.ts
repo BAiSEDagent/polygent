@@ -4,6 +4,9 @@ import { buildHmacSignature, BuilderApiKeyCreds } from '@polymarket/builder-sign
 import { logger } from '../utils/logger';
 import { config } from '../config';
 
+import { sanitizeObject } from '../utils/sanitize';
+import { builderSignSchema, formatZodError } from '../validation/schemas';
+
 /**
  * POST /sign — Remote Builder Signing Endpoint
  *
@@ -41,16 +44,12 @@ router.post('/', signRateLimit, async (req: Request, res: Response) => {
     }
   }
 
-  const { method, path, body } = req.body as {
-    method?: string;
-    path?: string;
-    body?: string;
-  };
-
-  if (!method || !path) {
-    res.status(400).json({ error: 'method and path are required' });
+  const parsed = builderSignSchema.safeParse(sanitizeObject(req.body));
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid sign request', details: formatZodError(parsed.error) });
     return;
   }
+  const { method, path, body } = parsed.data;
 
   // FAILSAFE: refuse to sign if builder creds aren't configured
   if (!config.BUILDER_API_KEY || !config.BUILDER_SECRET || !config.BUILDER_PASSPHRASE) {
@@ -67,7 +66,7 @@ router.post('/', signRateLimit, async (req: Request, res: Response) => {
       parseInt(timestamp),
       method,
       path,
-      body || '',
+      typeof body === 'string' ? body : JSON.stringify(body ?? ''),
     );
 
     const headers = {

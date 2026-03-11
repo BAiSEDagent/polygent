@@ -8,6 +8,16 @@ const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const MAX_DEPTH = 10;
 
 /**
+ * Remove HTML tags, trim whitespace, and enforce max length on text inputs.
+ * Returns empty string if result is blank.
+ */
+export function sanitizeText(input: string, maxLength: number): string {
+  if (typeof input !== 'string') return '';
+  return input.replace(/<[^>]*>/g, '').trim().slice(0, maxLength);
+}
+
+
+/**
  * Safe parseFloat wrapper that validates output.
  * Returns fallback value if input is invalid or results in NaN/Infinity.
  * 

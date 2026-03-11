@@ -9,10 +9,13 @@ import { clobClient } from '../core/clob';
 import { tradeStore } from '../models/trade';
 import { agentStore } from '../models/agent';
 import { broadcastTrade } from '../core/data-feed';
-import { Agent, Order, OrderRequest, Trade, TradeSource } from '../utils/types';
+import { Agent, Order, Trade, TradeSource } from '../utils/types';
 import { getAgentMutex } from '../utils/mutex';
 import { assertSignerIsAgent, SignedCLOBOrder } from '../utils/verify-signature';
 import { copyEngine } from '../core/copy-engine';
+
+import { sanitizeObject } from '../utils/sanitize';
+import { orderRequestSchema, signedOrderPayloadSchema, formatZodError } from '../validation/schemas';
 
 // Rate limit for relay endpoint: 10 requests/sec per API key, 60/min burst
 const relayRateLimit = rateLimit({
@@ -29,14 +32,13 @@ const router = Router();
 /** POST /api/orders — Place an order (internal agents) */
 router.post('/', authenticateAgent, async (req: Request, res: Response) => {
   const agent = (req as any).agent as Agent;
-  const body = req.body as OrderRequest;
 
-  // Validate request
-  const validation = validateOrderRequest(body);
-  if (validation) {
-    res.status(400).json({ error: validation });
+  const parsed = orderRequestSchema.safeParse(sanitizeObject(req.body));
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid order request', details: formatZodError(parsed.error) });
     return;
   }
+  const body = parsed.data;
 
   // Acquire per-agent mutex to prevent race conditions
   const mutex = getAgentMutex(agent.id);
@@ -87,7 +89,7 @@ router.post('/', authenticateAgent, async (req: Request, res: Response) => {
 
     try {
       // Submit to CLOB with slippage protection
-      const maxSlippage = typeof body.maxSlippage === 'number' ? body.maxSlippage : 0.02;
+      const maxSlippage = body.maxSlippage ?? 0.02;
       const result = await clobClient.placeOrder(agent.id, body, maxSlippage);
 
       tradeStore.updateOrder(orderId, {
@@ -173,18 +175,12 @@ router.post('/relay', relayRateLimit, authenticateAgent, async (req: Request, re
     return;
   }
 
-  const signedOrder: SignedCLOBOrder | undefined = req.body?.signedOrder;
-  if (!signedOrder) {
-    res.status(400).json({ error: 'signedOrder is required' });
+  const parsed = signedOrderPayloadSchema.safeParse(sanitizeObject(req.body));
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid signed order payload', details: formatZodError(parsed.error) });
     return;
   }
-
-  // Validate required order fields are present
-  const orderValidation = validateSignedOrder(signedOrder);
-  if (orderValidation) {
-    res.status(400).json({ error: orderValidation });
-    return;
-  }
+  const { signedOrder } = parsed.data;
 
   // ── SECURITY: cryptographic anti-spoofing check ──────────────────────────
   // Recover the EIP-712 signer from the signature and assert it matches the
@@ -385,27 +381,6 @@ router.get('/', authenticateAgent, (req: Request, res: Response) => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function validateOrderRequest(body: OrderRequest): string | null {
-  if (!body.marketId) return 'marketId is required';
-  if (!body.side || !['BUY', 'SELL'].includes(body.side)) return 'side must be BUY or SELL';
-  if (!body.outcome || !['YES', 'NO'].includes(body.outcome)) return 'outcome must be YES or NO';
-  if (typeof body.amount !== 'number' || body.amount <= 0 || body.amount > 1_000_000) return 'amount must be between 0 and 1,000,000';
-  if (typeof body.price !== 'number' || body.price < 0 || body.price > 1) return 'price must be between 0 and 1';
-  if (body.type && !['LIMIT', 'MARKET', 'FOK'].includes(body.type)) return 'type must be LIMIT, MARKET, or FOK';
-  if (body.maxSlippage !== undefined && (typeof body.maxSlippage !== 'number' || body.maxSlippage < 0 || body.maxSlippage > 0.50)) return 'maxSlippage must be between 0 and 0.50 (50%)';
-  return null;
-}
-
-function validateSignedOrder(o: SignedCLOBOrder): string | null {
-  const required = ['salt','maker','signer','taker','tokenId','makerAmount','takerAmount','expiration','nonce','feeRateBps','signature'] as const;
-  for (const field of required) {
-    if (!o[field]) return `signedOrder.${field} is required`;
-  }
-  if (typeof o.side !== 'number' || ![0, 1].includes(o.side)) return 'signedOrder.side must be 0 (BUY) or 1 (SELL)';
-  if (typeof o.signatureType !== 'number') return 'signedOrder.signatureType is required';
-  if (!o.signature.startsWith('0x')) return 'signedOrder.signature must be a hex string starting with 0x';
-  return null;
-}
 
 /**
  * Generate Polymarket L2 HMAC-SHA256 auth headers.

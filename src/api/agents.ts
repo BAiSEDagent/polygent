@@ -10,6 +10,9 @@ import { tradeStore } from '../models/trade';
 import { AgentCreateRequest, AgentCreateResponse } from '../utils/types';
 import { checkAgentHealth } from '../core/health-check';
 
+import { sanitizeObject, sanitizeText } from '../utils/sanitize';
+import { agentRegisterSchema, agentCreateSchema, agentPatchSchema, agentOnboardSchema, formatZodError } from '../validation/schemas';
+
 const router = Router();
 
 // Agent registration rate limit: 5 registrations per hour per IP
@@ -53,41 +56,15 @@ const MAX_AGENT_COUNT = 100;
  */
 router.post('/register', externalRegistrationRateLimit, async (req: Request, res: Response) => {
   try {
-    const { name, description, strategy, eoaAddress, proxyAddress } = req.body as {
-      name?: string;
-      description?: string;
-      strategy?: string;
-      eoaAddress?: string;
-      proxyAddress?: string;
-    };
-
-    // ── Input validation ──────────────────────────────────────────────────────
-    if (!name || typeof name !== 'string') {
-      res.status(400).json({ error: 'name is required' });
+    const parsed = agentRegisterSchema.safeParse(sanitizeObject(req.body));
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid registration payload', details: formatZodError(parsed.error) });
       return;
     }
+    const { name, description, strategy, eoaAddress, proxyAddress } = parsed.data;
 
-    const cleanName = name.replace(/<[^>]*>/g, '').trim().slice(0, 100);
-    if (!cleanName) {
-      res.status(400).json({ error: 'name cannot be empty' });
-      return;
-    }
-
-    if (!eoaAddress || !ethers.utils.isAddress(eoaAddress)) {
-      res.status(400).json({ error: 'eoaAddress is required and must be a valid Ethereum address' });
-      return;
-    }
-
-    if (!proxyAddress || !ethers.utils.isAddress(proxyAddress)) {
-      res.status(400).json({ error: 'proxyAddress is required and must be a valid Ethereum address (your Polymarket proxy/Gnosis Safe wallet)' });
-      return;
-    }
-
-    // EOA and proxy must be different — if they match the dev likely doesn't have a proxy deployed
     if (eoaAddress.toLowerCase() === proxyAddress.toLowerCase()) {
-      res.status(400).json({
-        error: 'eoaAddress and proxyAddress must be different. proxyAddress is your Polymarket Gnosis Safe / proxy wallet (not your signing EOA). See docs for how to deploy a proxy wallet.',
-      });
+      res.status(400).json({ error: 'eoaAddress and proxyAddress must be different (proxy = maker Safe)' });
       return;
     }
 
@@ -96,14 +73,13 @@ router.post('/register', externalRegistrationRateLimit, async (req: Request, res
       return;
     }
 
-    // Duplicate name check
+    const cleanName = name;
     const duplicate = agentStore.list().find((a) => a.name.toLowerCase() === cleanName.toLowerCase());
     if (duplicate) {
       res.status(409).json({ error: `Agent name '${cleanName}' is already taken` });
       return;
     }
 
-    // Duplicate EOA check — one registration per EOA
     const existingEoa = agentStore.list().find(
       (a) => a.walletAddress?.toLowerCase() === eoaAddress.toLowerCase()
     );
@@ -112,29 +88,18 @@ router.post('/register', externalRegistrationRateLimit, async (req: Request, res
       return;
     }
 
-    // ── Create agent ──────────────────────────────────────────────────────────
     const apiKey  = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
     const id = `ext_${uuid().replace(/-/g, '').slice(0, 12)}`;
 
-    const cleanDesc = description
-      ? String(description).replace(/<[^>]*>/g, '').trim().slice(0, 500)
-      : undefined;
-    const cleanStrategy = strategy
-      ? String(strategy).replace(/<[^>]*>/g, '').trim().slice(0, 100)
-      : undefined;
-
-    // External agents bring their own wallets — no internal key stored.
-    // walletAddress = EOA (used by /relay for EIP-712 verification)
-    // proxyWallet   = Gnosis Safe (the maker address in CLOB orders)
     const agent = agentStore.createExternal({
       id,
       name: cleanName,
-      description: cleanDesc,
-      strategy: cleanStrategy,
+      description,
+      strategy,
       apiKeyHash,
-      walletAddress: ethers.utils.getAddress(eoaAddress),   // checksummed
-      proxyWallet:   ethers.utils.getAddress(proxyAddress),  // checksummed
+      walletAddress: eoaAddress,
+      proxyWallet: proxyAddress,
     });
 
     logger.info('External agent registered', {
@@ -147,9 +112,8 @@ router.post('/register', externalRegistrationRateLimit, async (req: Request, res
     res.status(201).json({
       agentId: agent.id,
       name: agent.name,
-      // API key is returned ONCE. It is never stored in plaintext. If lost, register again.
       apiKey,
-      eoaAddress:   agent.walletAddress,
+      eoaAddress: agent.walletAddress,
       proxyAddress: agent.proxyWallet,
       leaderboardUrl: `https://polygent.market/leaderboard#${agent.id}`,
       relayEndpoint:  'https://polygent.market/api/orders/relay',
@@ -164,20 +128,12 @@ router.post('/register', externalRegistrationRateLimit, async (req: Request, res
 /** POST /api/agents — Register a new internal agent (requires admin API key) */
 router.post('/', registrationRateLimit, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const body = req.body as AgentCreateRequest;
-
-    if (!body.name || typeof body.name !== 'string') {
-      res.status(400).json({ error: 'name is required (string)' });
+    const parsed = agentCreateSchema.safeParse(sanitizeObject(req.body));
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid agent payload', details: formatZodError(parsed.error) });
       return;
     }
-
-    const name = body.name.replace(/<[^>]*>/g, '').trim().slice(0, 100);
-    const description = body.description
-      ? String(body.description).replace(/<[^>]*>/g, '').trim().slice(0, 500)
-      : undefined;
-    const strategy = body.strategy
-      ? String(body.strategy).replace(/<[^>]*>/g, '').trim().slice(0, 100)
-      : undefined;
+    const { name, description, strategy, deposit, config } = parsed.data;
 
     if (!name) {
       res.status(400).json({ error: 'name cannot be empty after sanitization' });
@@ -208,8 +164,8 @@ router.post('/', registrationRateLimit, requireAdmin, async (req: Request, res: 
       apiKeyHash,
       privateKey: wallet.privateKey,
       walletAddress: wallet.address,
-      configOverrides: body.config,
-      deposit: body.deposit,
+      configOverrides: config,
+      deposit,
       registeredViaApi: true,
     });
 
@@ -303,19 +259,22 @@ router.patch('/:id', requireAdmin, (req: Request, res: Response) => {
     return;
   }
 
-  const updates = req.body as { autoRedeem?: boolean; config?: Partial<any> };
-  
-  // Update auto_redeem setting
+  const parsed = agentPatchSchema.safeParse(sanitizeObject(req.body));
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid agent update payload', details: formatZodError(parsed.error) });
+    return;
+  }
+  const updates = parsed.data;
+
   if (typeof updates.autoRedeem === 'boolean') {
     try {
       const db = require('../core/db').getDb();
       db.prepare('UPDATE agents SET auto_redeem = ?, updated_at = ? WHERE id = ?')
         .run(updates.autoRedeem ? 1 : 0, Date.now(), agent.id);
-      
-      // Update in-memory
+
       agent.autoRedeem = updates.autoRedeem;
       agent.updatedAt = Date.now();
-      
+
       logger.info(`Agent ${agent.id} auto-redeem set to ${updates.autoRedeem}`);
     } catch (err) {
       logger.error('Failed to update agent auto_redeem', { 
@@ -370,12 +329,12 @@ router.post('/:id/reset', requireAdmin, (req: Request, res: Response) => {
  * For now, this enables server-side onboarding for AI agents that trust Polygent.
  */
 router.post('/onboard', async (req: Request, res: Response) => {
-  const { privateKey, name } = req.body as { privateKey?: string; name?: string };
-
-  if (!privateKey || !privateKey.startsWith('0x')) {
-    res.status(400).json({ error: 'privateKey (hex, 0x-prefixed) is required' });
+  const parsed = agentOnboardSchema.safeParse(sanitizeObject(req.body));
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid onboarding payload', details: formatZodError(parsed.error) });
     return;
   }
+  const { privateKey, name } = parsed.data;
 
   try {
     const { onboardAgent } = await import('../core/agent-onboard');

@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
-import { ethers } from 'ethers';
 import rateLimit from 'express-rate-limit';
 import { requireAdmin } from '../utils/auth';
 import { copierStore } from '../models/copier';
 import { copyEngine } from '../core/copy-engine';
+
+import { sanitizeObject } from '../utils/sanitize';
+import { copierCreateSchema, copierTestTriggerSchema, formatZodError } from '../validation/schemas';
 
 const router = Router();
 
@@ -20,32 +22,23 @@ const publicLimiter = rateLimit({
  * Public endpoint called by wallet-connected frontend after deriveApiKey()
  */
 router.post('/', publicLimiter, (req: Request, res: Response) => {
-  const { copierAddress, agentId, fixedUsdc, apiKey, apiSecret, apiPassphrase, l2PrivateKey } = req.body ?? {};
-
-  if (!copierAddress || !agentId || !apiKey || !apiSecret || !apiPassphrase || !l2PrivateKey) {
-    res.status(400).json({ error: 'copierAddress, agentId, apiKey, apiSecret, apiPassphrase, l2PrivateKey are required' });
+  const parsed = copierCreateSchema.safeParse(sanitizeObject(req.body));
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid copier payload', details: formatZodError(parsed.error) });
     return;
   }
-  if (!ethers.utils.isAddress(String(copierAddress))) {
-    res.status(400).json({ error: 'copierAddress must be a valid Ethereum address' });
-    return;
-  }
-  const usd = Number(fixedUsdc);
-  if (!Number.isFinite(usd) || usd <= 0 || usd > 1000) {
-    res.status(400).json({ error: 'fixedUsdc must be between 0 and 1000' });
-    return;
-  }
+  const { copierAddress, agentId, fixedUsdc, apiKey, apiSecret, apiPassphrase, l2PrivateKey } = parsed.data;
 
   try {
     const delegation = copierStore.create({
       id: `cp_${uuid().replace(/-/g, '').slice(0, 12)}`,
-      copierAddress: ethers.utils.getAddress(String(copierAddress)),
-      agentId: String(agentId),
-      fixedUsdc: usd,
-      apiKey: String(apiKey),
-      apiSecret: String(apiSecret),
-      apiPassphrase: String(apiPassphrase),
-      l2PrivateKey: String(l2PrivateKey),
+      copierAddress,
+      agentId,
+      fixedUsdc,
+      apiKey,
+      apiSecret,
+      apiPassphrase,
+      l2PrivateKey,
       active: true,
     });
 
@@ -69,19 +62,20 @@ router.get('/delegations/:agentId', requireAdmin, (req: Request, res: Response) 
 
 /**** Admin test hook: simulate source trade to validate copy execution ****/
 router.post('/test-trigger', requireAdmin, (req: Request, res: Response) => {
-  const { agentId, marketId = 'test_market', side = 'BUY', outcome = 'YES', amount = 10, price = 0.5 } = req.body ?? {};
-  if (!agentId) {
-    res.status(400).json({ error: 'agentId is required' });
+  const parsed = copierTestTriggerSchema.safeParse(sanitizeObject(req.body));
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid test trigger payload', details: formatZodError(parsed.error) });
     return;
   }
+  const { agentId, marketId = 'test_market', side = 'BUY', outcome = 'YES', amount = 10, price = 0.5 } = parsed.data;
 
   copyEngine.processAsync({
-    agentId: String(agentId),
-    marketId: String(marketId),
-    side: String(side),
-    outcome: String(outcome),
-    amount: Number(amount),
-    price: Number(price),
+    agentId,
+    marketId: marketId as string,
+    side: side as string,
+    outcome: outcome as string,
+    amount: amount as number,
+    price: price as number,
   });
 
   res.json({ ok: true, queued: true });
